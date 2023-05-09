@@ -1,2 +1,3 @@
 # iFixBox
-Deterministic 2d physics 
+
+A description of this package.
