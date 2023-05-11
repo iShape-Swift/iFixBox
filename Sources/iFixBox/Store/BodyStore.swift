@@ -100,20 +100,18 @@ private extension Array where Element == Int64 {
     func findFreeIndex(value: Int64) -> Int {
         var left = 0
         var right = self.count - 1
-        var j = -1
-        var i = right >> 1
+        var i = right
         var x = self[i]
 
-        while i != j {
+        while left < right {
             if x > value {
-                right = i - 1
+                right = i
             } else if x < value {
                 left = i + 1
             } else {
                 return -1
             }
 
-            j = i
             i = (left + right) >> 1
             x = self[i]
         }

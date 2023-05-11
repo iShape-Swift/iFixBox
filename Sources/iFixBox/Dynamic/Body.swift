@@ -43,7 +43,7 @@ public struct Body {
         self.transform = transform
         self.boundary = Boundary.zero
         self.isAlive = true
-        self.applyGravity = applyGravity
+        self.applyGravity = applyGravity && isDynamic
         self.acceleration = Acceleration.zero
     }
 

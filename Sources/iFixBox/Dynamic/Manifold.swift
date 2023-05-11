@@ -7,6 +7,11 @@
 
 import iFixFloat
 
+struct Other {
+    let isA: Bool
+    let index: Int
+}
+
 struct ImpactSolution {
     
     static let noImpact = ImpactSolution(velA: .zero, velB: .zero, isImpact: false)
@@ -21,34 +26,16 @@ struct VarBody {
     let index: Int // global index in bodies Array
     var velocity: Velocity
     
-    var partnerCount: Int32
-
-    // if partnerCount <= 4 data will represent index otherwise data_0 is index in Array
-    var data_0: Int32
-    var data_1: Int32
-    var data_2: Int32
-    var data_3: Int32
+    var manifolds: [Int32]
     
-    init(index: Int, velocity: Velocity) {
+    init(index: Int, manifold: Int, velocity: Velocity) {
         self.index = index
         self.velocity = velocity
-        partnerCount = 1
-        data_0 = -1
-        data_1 = -1
-        data_2 = -1
-        data_3 = -1
+        manifolds = [Int32(manifold)]
     }
     
-    mutating func add(index: Int) {
-        if data_0 == -1 {
-            data_0 = Int32(index)
-        } else if data_1 == -1 {
-            data_1 = Int32(index)
-        } else if data_2 == -1 {
-            data_2 = Int32(index)
-        } else if data_3 == -1 {
-            data_3 = Int32(index)
-        }
+    mutating func add(manifold: Int) {
+        manifolds.append(Int32(manifold))
     }
 }
 
@@ -252,4 +239,60 @@ struct Manifold {
 
         return ImpactSolution(velA: Velocity(linear: aV2, angular: aW2), velB: .zero, isImpact: true)
     }
+  
+    func other(index: Int) -> Other {
+        if index == vA {
+            return Other(isA: true, index: vB)
+        } else {
+            return Other(isA: false, index: vA)
+        }
+    }
+
+    func possibleVelocity(varA: Velocity, varB: Velocity) -> FixFloat {
+        // normal to contact point
+        let n = contact.normal
+
+        let aV1 = varA.linear
+        let aW1 = varA.angular
+
+        let aR = contact.point - a.transform.position
+
+        let av = aV1 + aR.crossProduct(aW1)
+        let an = av.dotProduct(n)
+        
+//        if an >= 0 {
+//            return .zero
+//        }
+
+        let bV1 = varB.linear
+        let bW1 = varB.angular
+        
+        // distance between center of Mass B to contact point
+        let bR = contact.point - b.transform.position
+
+        let bv = bV1 + bR.crossProduct(bW1)
+        
+        let bn = bv.dotProduct(n)
+        
+        let rn = an - bn
+        
+        if rn >= -20 {
+            return .unit
+        }
+
+        if an <= bn {
+            return 0
+        }
+
+        if an == .zero {
+            return 0
+        }
+
+        return bn.div(an)
+    }
+    
+    func possibleVelocity(varA: Velocity) -> FixFloat {
+        return self.possibleVelocity(varA: varA, varB: b.startVel)
+    }
+    
 }

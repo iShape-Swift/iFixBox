@@ -18,7 +18,7 @@ public struct World {
     
     public let timeStep: FixFloat
     
-    public init(boundary: Boundary, settings: WorldSettings, gravity: FixVec) {
+    public init(boundary: Boundary, settings: WorldSettings, gravity: FixVec = FixVec(0, -10.fix)) {
         freezeBoundary = Boundary(min: boundary.min - FixVec(settings.freezeMargin, settings.freezeMargin), max: boundary.max + FixVec(settings.freezeMargin, settings.freezeMargin))
         self.gravity = gravity
         
