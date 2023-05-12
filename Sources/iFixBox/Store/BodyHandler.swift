@@ -10,7 +10,7 @@ public struct BodyHandler {
     public static let empty = BodyHandler(id: -1, index: -1, timeStamp: -1)
     
     public let id: Int64
-    let index: Int
+    public let index: Int
     let timeStamp: Int
 
     public init(id: Int64) {

@@ -44,7 +44,7 @@ struct LetBody {
     let transform: Transform
     let startVel: Velocity
     let invMass: FixFloat
-    let invInertia: FixFloat
+    let invInertia: FixDouble
     var isDynamic: Bool { invMass != 0 }
     
     init(body: Body) {
@@ -54,7 +54,6 @@ struct LetBody {
         self.invInertia = body.invInertia
     }
 }
-
 
 struct Manifold {
     
@@ -120,7 +119,7 @@ struct Manifold {
         let aRn = aR.crossProduct(n)
         let bRn = bR.crossProduct(n)
         let iNum = rV1proj.mul(ke)
-        let iDen = a.invMass + b.invMass + aRn.sqr.mul(a.invInertia) + bRn.sqr.mul(b.invInertia)
+        let iDen = a.invMass + b.invMass + aRn.sqr.mul(fixDouble: a.invInertia) + bRn.sqr.mul(fixDouble: b.invInertia)
         let i = iNum.div(iDen)
 
         // new linear velocity
@@ -128,22 +127,22 @@ struct Manifold {
         var bV2 = bV1 - i.mul(b.invMass) * n
         
         // new angular velocity
-        var aW2 = aW1 + aRn.mul(i).mul(a.invInertia)
-        var bW2 = bW1 - bRn.mul(i).mul(b.invInertia)
+        var aW2 = aW1 + aRn.mul(i).mul(fixDouble: a.invInertia)
+        var bW2 = bW1 - bRn.mul(i).mul(fixDouble: b.invInertia)
 
         // tangent vector
         // leaving only the component that is parallel to the contact surface
-        var f = rV1 - n * rV1proj
+        let f = rV1 - n * rV1proj
         let sqrF = f.sqrLength
 
         // ignore if it to small
         if sqrF >= 1 {
-            f = f.normalize
+            let t = FixVec(n.y, -n.x)
             
-            let aRf = aR.crossProduct(f)
-            let bRf = bR.crossProduct(f)
-            let jNum = rV1.dotProduct(f).mul(ke)
-            let jDen = a.invMass + b.invMass + aRf.sqr.mul(a.invInertia) + bRf.sqr.mul(b.invInertia)
+            let aRf = aR.crossProduct(t)
+            let bRf = bR.crossProduct(t)
+            let jNum = -rV1.dotProduct(t)
+            let jDen = a.invMass + b.invMass + aRf.sqr.mul(fixDouble: a.invInertia) + bRf.sqr.mul(fixDouble: b.invInertia)
             var j = jNum.div(jDen)
             
             // can not be more then original impulse
@@ -151,12 +150,12 @@ struct Manifold {
             j = j.clamp(min: -maxFi, max: maxFi)
             
             // new linear velocity
-            aV2 = aV2 + j.mul(a.invMass) * f
-            bV2 = bV2 - j.mul(b.invMass) * f
+            aV2 = aV2 + j.mul(a.invMass) * t
+            bV2 = bV2 - j.mul(b.invMass) * t
         
             // new angular velocity
-            aW2 = aW2 + aRf.mul(j).mul(a.invInertia)
-            bW2 = bW2 - bRf.mul(j).mul(b.invInertia)
+            aW2 = aW2 + aRf.mul(j).mul(fixDouble: a.invInertia)
+            bW2 = bW2 - bRf.mul(j).mul(fixDouble: b.invInertia)
         }
 
         return ImpactSolution(
@@ -203,27 +202,27 @@ struct Manifold {
         
         let aRn = aR.crossProduct(n) // can be cached
         let iNum = rV1proj.mul(ke)
-        let iDen = a.invMass + aRn.sqr.mul(a.invInertia)
+        let iDen = a.invMass + aRn.sqr.mul(fixDouble: a.invInertia)
         let i = iNum.div(iDen)
 
         // new linear velocity
         var aV2 = aV1 + i.mul(a.invMass) * n
         
         // new angular velocity
-        var aW2 = aW1 + aRn.mul(i).mul(a.invInertia)
+        var aW2 = aW1 + aRn.mul(i).mul(fixDouble: a.invInertia)
 
         // tangent vector
         // leaving only the component that is parallel to the contact surface
-        var f = rV1 - n * rV1proj
+        let f = rV1 - n * rV1proj
         let sqrF = f.sqrLength
 
         // ignore if it to small
         if sqrF >= 1 {
-            f = f.normalize
+            let t = FixVec(n.y, -n.x)
             
-            let aRf = aR.crossProduct(f)
-            let jNum = rV1.dotProduct(f).mul(ke)
-            let jDen = a.invMass + aRf.sqr.mul(a.invInertia)
+            let aRf = aR.crossProduct(t)
+            let jNum = -rV1.dotProduct(t)
+            let jDen = a.invMass + aRf.sqr.mul(fixDouble: a.invInertia)
             var j = jNum.div(jDen)
             
             // can not be more then original impulse
@@ -231,10 +230,10 @@ struct Manifold {
             j = j.clamp(min: -maxFi, max: maxFi)
             
             // new linear velocity
-            aV2 = aV2 + j.mul(a.invMass) * f
+            aV2 = aV2 + j.mul(a.invMass) * t
         
             // new angular velocity
-            aW2 = aW2 + aRf.mul(j).mul(a.invInertia)
+            aW2 = aW2 + aRf.mul(j).mul(fixDouble: a.invInertia)
         }
 
         return ImpactSolution(velA: Velocity(linear: aV2, angular: aW2), velB: .zero, isImpact: true)

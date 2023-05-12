@@ -54,11 +54,15 @@ public extension World {
                     if a.boundary.isCollide(b.boundary) {
                         if a.isDynamic {
                             let contact = collisionSolver.collide(a, b)
-                            manifolds.append(Manifold(a: a, b: b, iA: iA, iB: iB, contact: contact))
+                            if contact.type != .outside {
+                                manifolds.append(Manifold(a: a, b: b, iA: iA, iB: iB, contact: contact))
+                            }
                         } else {
                             // static will be always B
                             let contact = collisionSolver.collide(b, a)
-                            manifolds.append(Manifold(a: b, b: a, iA: iB, iB: iA, contact: contact))
+                            if contact.type != .outside {
+                                manifolds.append(Manifold(a: b, b: a, iA: iB, iB: iA, contact: contact))
+                            }
                         }
                     }
                 }
@@ -191,7 +195,7 @@ public extension World {
             }
             
             let moveLinear = varBody.velocity.linear * max
-            let moveAngular = varBody.velocity.angular.mul(max)
+            let moveAngular = varBody.velocity.angular.mul(max / 2)
 
             var body = bodies[varBody.index]
 
