@@ -14,26 +14,48 @@ public struct Transform {
     public let angle: Int64
     public let rotator: FixVec
     
+    @inlinable
     public init(position: FixVec, angle: Int64 = 0) {
         self.position = position
         self.angle = angle
         self.rotator = angle.radToFixAngle.rotator
     }
     
-    private init(position: FixVec, angle: Int64, rotator: FixVec) {
+    @inlinable
+    init(position: FixVec, angle: Int64, rotator: FixVec) {
         self.position = position
         self.angle = angle
         self.rotator = rotator
     }
     
+    @inlinable
     public func convertAsPoint(_ point: FixVec) -> FixVec {
-        return convertAsVector(point) + position
+        convertAsVector(point) + position
+    }
+
+    @inlinable
+    public func convertAsPoints(_ points: [FixVec]) -> [FixVec] {
+        var result = [FixVec](repeating: .zero, count: points.count)
+        for i in 0..<points.count {
+            result[i] = convertAsPoint(points[i])
+        }
+        return result
     }
     
+    @inlinable
     public func convertAsVector(_ vector: FixVec) -> FixVec {
         let x = (rotator.x * vector.x - rotator.y * vector.y).normalize
         let y = (rotator.y * vector.x + rotator.x * vector.y).normalize
         return FixVec(x, y)
+    }
+    
+    @inlinable
+    public func convertAsVectors(_ vectors: [FixVec]) -> [FixVec] {
+        var result = [FixVec](repeating: .zero, count: vectors.count)
+        for i in 0..<vectors.count {
+            result[i] = convertAsVector(vectors[i])
+        }
+        return result
     }
     
     public func convert(_ boundary: Boundary) -> Boundary {
@@ -60,6 +82,7 @@ public struct Transform {
         }
     }
     
+    @inlinable
     public func convert(_ contact: Contact) -> Contact {
         let point = convertAsPoint(contact.point)
         let normal = convertAsVector(contact.normal)
@@ -67,6 +90,7 @@ public struct Transform {
         return Contact(point: point, normal: normal, penetration: contact.penetration, count: contact.count, type: contact.type)
     }
     
+    @inlinable
     public func apply(_ v: Velocity, timeStep: Int64) -> Transform {
         let dv = v.linear * timeStep
         let p = position + dv
@@ -79,8 +103,9 @@ public struct Transform {
         }
     }
     
+    @inlinable
     public func apply(_ delta: FixVec) -> Transform {
-        return Transform(position: position + delta, angle: angle, rotator: rotator)
+        Transform(position: position + delta, angle: angle, rotator: rotator)
     }
     
     public static func convertFromBtoA(_ b: Transform, _ a: Transform) -> Transform {

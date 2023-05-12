@@ -18,7 +18,15 @@ public extension World {
 
         var bodies = bodyStore.bodies
         
-        var manifolds = prepareManifolds(bodies: bodies)
+        var manifolds: [Manifold]
+        
+        if isDebug {
+            let manifoldBundle = prepareManifoldsDebug(bodies: bodies)
+            manifolds = manifoldBundle.manifolds
+            contacts = manifoldBundle.contacts
+        } else {
+            manifolds = prepareManifolds(bodies: bodies)
+        }
         
         let varBundle = prepareVars(manifolds: &manifolds, count: bodies.count)
         
@@ -35,11 +43,6 @@ public extension World {
         integrateVarsClassic(bodies: &bodies, manifolds: manifolds, vars: vars)
         
         bodyStore.bodies = bodies
-        
-        if self.isDebug {
-            contacts.removeAll()
-            contacts = manifolds.map { $0.contact }
-        }
     }
     
     private func prepareManifolds(bodies: [Body]) -> [Manifold] {
@@ -60,13 +63,13 @@ public extension World {
                         if a.isDynamic {
                             let contact = collisionSolver.collide(a, b)
                             if contact.type != .outside {
-                                manifolds.append(Manifold(a: a, b: b, iA: iA, iB: iB, contact: contact))
+                                manifolds.append(Manifold(a: a, b: b, iA: iA, iB: iB, contact: contact, iTimeStep: iTimeStep))
                             }
                         } else {
                             // static will be always B
                             let contact = collisionSolver.collide(b, a)
                             if contact.type != .outside {
-                                manifolds.append(Manifold(a: b, b: a, iA: iB, iB: iA, contact: contact))
+                                manifolds.append(Manifold(a: b, b: a, iA: iB, iB: iA, contact: contact, iTimeStep: iTimeStep))
                             }
                         }
                     }
@@ -75,6 +78,44 @@ public extension World {
         }
         
         return manifolds
+    }
+    
+    private func prepareManifoldsDebug(bodies: [Body]) -> (manifolds: [Manifold], contacts: [Contact]) {
+
+        var manifolds = [Manifold]()
+        var contacts = [Contact]()
+        manifolds.reserveCapacity(16 + (bodies.count >> 16))
+        
+        // find all contacts
+        
+        // can be parallelized
+        for iA in 0..<bodies.count - 1 {
+            let a = bodies[iA]
+            for iB in iA + 1..<bodies.count {
+                let b = bodies[iB]
+                
+                if a.isDynamic || b.isDynamic {
+                    if a.boundary.isCollide(b.boundary) {
+                        if a.isDynamic {
+                            let contact = collisionSolver.collide(a, b)
+                            if contact.type != .outside {
+                                manifolds.append(Manifold(a: a, b: b, iA: iA, iB: iB, contact: contact, iTimeStep: iTimeStep))
+                                contacts.append(contact)
+                            }
+                        } else {
+                            // static will be always B
+                            let contact = collisionSolver.collide(b, a)
+                            if contact.type != .outside {
+                                manifolds.append(Manifold(a: b, b: a, iA: iB, iB: iA, contact: contact, iTimeStep: iTimeStep))
+                                contacts.append(contact)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        return (manifolds, contacts)
     }
 
     private func prepareVars(manifolds: inout [Manifold], count: Int) -> VarBundle {
@@ -134,7 +175,7 @@ public extension World {
                 if m.vB >= 0 {
                     var vA = vars[m.vA]
                     var vB = vars[m.vB]
-                    let solution = m.resolve(varA: vA, varB: vB, iDt: iTimeStep)
+                    let solution = m.resolve(varA: vA, varB: vB)
                     if solution.isImpact {
                         vA.velocity = solution.velA
                         vB.velocity = solution.velB
@@ -144,7 +185,7 @@ public extension World {
                 } else {
                     // B is static
                     var vA = vars[m.vA]
-                    let solution = m.resolve(varA: vA, iDt: iTimeStep)
+                    let solution = m.resolve(varA: vA)
                     if solution.isImpact {
                         vA.velocity = solution.velA
                         vars[m.vA] = vA

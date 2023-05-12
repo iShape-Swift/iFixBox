@@ -41,14 +41,15 @@ struct VarBody {
 
 struct LetBody {
 
-    let transform: Transform
     let startVel: Velocity
     let invMass: FixFloat
     let invInertia: FixDouble
+    
+    @inlinable
     var isDynamic: Bool { invMass != 0 }
     
+    @inlinable
     init(body: Body) {
-        self.transform = body.transform
         self.startVel = body.velocity
         self.invMass = body.invMass
         self.invInertia = body.invInertia
@@ -59,22 +60,64 @@ struct Manifold {
     
     let a: LetBody
     let b: LetBody
-    let e: FixFloat
+    let ke: FixFloat
     let q: FixFloat
-    let contact: Contact
+    let bias: FixFloat
+    let n: FixVec
     let iA: Int         // global index in bodies Array
     let iB: Int         // global index in bodies Array
     var vA: Int = -1    // index in vars
     var vB: Int = -1    // index in vars
     
-    init(a: Body, b: Body, iA: Int, iB: Int, contact: Contact) {
+    let aR: FixVec
+    let bR: FixVec
+    let aRn: FixFloat
+    let bRn: FixFloat
+
+    let aRf: FixFloat
+    let bRf: FixFloat
+    
+    let iDen: FixFloat
+    let jDen: FixFloat
+    
+    init(a: Body, b: Body, iA: Int, iB: Int, contact: Contact, iTimeStep: FixFloat) {
         self.a = LetBody(body: a)
         self.b = LetBody(body: b)
         self.iA = iA
         self.iB = iB
-        self.contact = contact
-        self.e = max(a.material.bounce, b.material.bounce)
-        self.q = (a.material.friction + b.material.friction) >> 1
+        
+        // Normal is always look at A * <-| * B
+        self.n = contact.normal
+        
+        // -(1 + e)
+        ke = -max(a.material.bounce, b.material.bounce) - .unit
+        q = (a.material.friction + b.material.friction) >> 1
+        
+        if contact.penetration < 0 {
+            let l = -contact.penetration
+            let maxBias = l.mul(iTimeStep) + 1
+            bias = min(.half, maxBias)
+        } else {
+            bias = 0
+        }
+        
+        // distance between center of Mass A to contact point
+        aR = contact.point - a.transform.position
+        
+        // distance between center of Mass B to contact point
+        bR = contact.point - b.transform.position
+        
+        aRn = aR.crossProduct(n)
+        bRn = bR.crossProduct(n)
+        
+        iDen = a.invMass + b.invMass + aRn.sqr.mul(fixDouble: a.invInertia) + bRn.sqr.mul(fixDouble: b.invInertia)
+        
+        let t = FixVec(n.y, -n.x)
+        
+        aRf = aR.crossProduct(t)
+        bRf = bR.crossProduct(t)
+        
+        jDen = a.invMass + b.invMass + aRf.sqr.mul(fixDouble: a.invInertia) + bRf.sqr.mul(fixDouble: b.invInertia)
     }
     
     mutating func set(vA: Int, vB: Int) {
@@ -82,22 +125,13 @@ struct Manifold {
         self.vB = vB
     }
     
-    func resolve(varA: VarBody, varB: VarBody, iDt: FixFloat) -> ImpactSolution {
-        // normal to contact point
-        let n = contact.normal
-        
+    func resolve(varA: VarBody, varB: VarBody) -> ImpactSolution {
         // start linear and angular velocity for A and B
         let aV1 = varA.velocity.linear
         let aW1 = varA.velocity.angular
 
         let bV1 = varB.velocity.linear
         let bW1 = varB.velocity.angular
-        
-        // distance between center of Mass A to contact point
-        let aR = contact.point - a.transform.position
-        
-        // distance between center of Mass B to contact point
-        let bR = contact.point - b.transform.position
 
         // relative velocity
         let rV1 = aV1 - bV1 + aR.crossProduct(aW1) - bR.crossProduct(bW1)
@@ -105,28 +139,16 @@ struct Manifold {
         var rV1proj = rV1.dotProduct(n)
         
         // only if getting closer
-        guard rV1proj < 0 else {
-            // still can penetrate
+        guard rV1proj < bias else {
             return .noImpact
         }
-
-        if contact.penetration < 0 {
-            let l = -contact.penetration
-            let maxBias = l.mul(iDt)
-            let bias = -min(.half, maxBias + 1)
-            rV1proj = min(bias, rV1proj)
-        }
         
-        // -(1 + e)
-        let ke = -e - .unit
+        rV1proj = min(rV1proj, -bias)
         
         // normal impulse
         // -(1 + e) * rV1 * n / (1 / Ma + 1 / Mb + (aR * t)^2 / aI)
 
-        let aRn = aR.crossProduct(n)
-        let bRn = bR.crossProduct(n)
         let iNum = rV1proj.mul(ke)
-        let iDen = a.invMass + b.invMass + aRn.sqr.mul(fixDouble: a.invInertia) + bRn.sqr.mul(fixDouble: b.invInertia)
         let i = iNum.div(iDen)
 
         // new linear velocity
@@ -145,11 +167,9 @@ struct Manifold {
         // ignore if it to small
         if sqrF >= 1 {
             let t = FixVec(n.y, -n.x)
-            
-            let aRf = aR.crossProduct(t)
-            let bRf = bR.crossProduct(t)
+
             let jNum = -rV1.dotProduct(t)
-            let jDen = a.invMass + b.invMass + aRf.sqr.mul(fixDouble: a.invInertia) + bRf.sqr.mul(fixDouble: b.invInertia)
+            
             var j = jNum.div(jDen)
             
             // can not be more then original impulse
@@ -173,11 +193,8 @@ struct Manifold {
     }
 
     
-    // TODO cache some parameters
-    func resolve(varA: VarBody, iDt: FixFloat) -> ImpactSolution {
-        // Normal is always look at A * <-| * B
-        let n = contact.normal
-        
+
+    func resolve(varA: VarBody) -> ImpactSolution {
         // start linear and angular velocity for A and B
         let aV1 = varA.velocity.linear
         let aW1 = varA.velocity.angular
@@ -185,38 +202,22 @@ struct Manifold {
         let bV1 = b.startVel.linear
         let bW1 = b.startVel.angular
         
-        // distance between center of Mass A to contact point
-        let aR = contact.point - a.transform.position
-        
-        // distance between center of Mass A to contact point
-        let bR = contact.point - b.transform.position
-        
         // relative velocity
         let rV1 = aV1 - bV1 + aR.crossProduct(aW1) - bR.crossProduct(bW1)
 
         var rV1proj = rV1.dotProduct(n)
         
         // only if getting closer
-        guard rV1proj < 0 else {
+        guard rV1proj < bias else {
             return .noImpact
         }
         
-        if contact.penetration < 0 {
-            let l = -contact.penetration - 1
-            let maxBias = l.mul(iDt)
-            let bias = -min(.half, maxBias)
-            rV1proj = min(bias, rV1proj)
-        }
-
-        // -(1 + e)
-        let ke = -e - .unit
+        rV1proj = min(rV1proj, -bias)
         
         // normal impulse
         // -(1 + e) * rV1 * n / (1 / Ma + (aR * t)^2 / aI)
         
-        let aRn = aR.crossProduct(n) // can be cached
         let iNum = rV1proj.mul(ke)
-        let iDen = a.invMass + aRn.sqr.mul(fixDouble: a.invInertia)
         let i = iNum.div(iDen)
 
         // new linear velocity
@@ -234,9 +235,7 @@ struct Manifold {
         if sqrF >= 1 {
             let t = FixVec(n.y, -n.x)
             
-            let aRf = aR.crossProduct(t)
             let jNum = -rV1.dotProduct(t)
-            let jDen = a.invMass + aRf.sqr.mul(fixDouble: a.invInertia)
             var j = jNum.div(jDen)
             
             // can not be more then original impulse
@@ -262,13 +261,10 @@ struct Manifold {
     }
 
     func possibleVelocity(varA: Velocity, varB: Velocity) -> FixFloat {
-        // normal to contact point
-        let n = contact.normal
 
         let aV1 = varA.linear
         let aW1 = varA.angular
 
-        let aR = contact.point - a.transform.position
 
         let av = aV1 + aR.crossProduct(aW1)
         let an = av.dotProduct(n)
@@ -279,9 +275,6 @@ struct Manifold {
 
         let bV1 = varB.linear
         let bW1 = varB.angular
-        
-        // distance between center of Mass B to contact point
-        let bR = contact.point - b.transform.position
 
         let bv = bV1 + bR.crossProduct(bW1)
         
