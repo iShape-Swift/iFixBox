@@ -32,9 +32,14 @@ public extension World {
         integrateNoImpact(bodies: &bodies, vSet: vSet)
         
         // integrate var bodies
-        integrateVars(bodies: &bodies, manifolds: manifolds, vars: vars)
+        integrateVarsClassic(bodies: &bodies, manifolds: manifolds, vars: vars)
         
         bodyStore.bodies = bodies
+        
+        if self.isDebug {
+            contacts.removeAll()
+            contacts = manifolds.map { $0.contact }
+        }
     }
     
     private func prepareManifolds(bodies: [Body]) -> [Manifold] {
@@ -122,26 +127,28 @@ public extension World {
     }
     
     private func iterateVars(vars: inout [VarBody], manifolds: [Manifold]) {
-        for m in manifolds {
-            
-            // A can not be static
-            if m.vB >= 0 {
-                var vA = vars[m.vA]
-                var vB = vars[m.vB]
-                let solution = m.resolve(varA: vA, varB: vB)
-                if solution.isImpact {
-                    vA.velocity = solution.velA
-                    vB.velocity = solution.velB
-                    vars[m.vA] = vA
-                    vars[m.vB] = vB
-                }
-            } else {
-                // B is static
-                var vA = vars[m.vA]
-                let solution = m.resolve(varA: vA)
-                if solution.isImpact {
-                    vA.velocity = solution.velA
-                    vars[m.vA] = vA
+        for _ in 0..<10 {
+            for m in manifolds {
+                
+                // A can not be static
+                if m.vB >= 0 {
+                    var vA = vars[m.vA]
+                    var vB = vars[m.vB]
+                    let solution = m.resolve(varA: vA, varB: vB, iDt: iTimeStep)
+                    if solution.isImpact {
+                        vA.velocity = solution.velA
+                        vB.velocity = solution.velB
+                        vars[m.vA] = vA
+                        vars[m.vB] = vB
+                    }
+                } else {
+                    // B is static
+                    var vA = vars[m.vA]
+                    let solution = m.resolve(varA: vA, iDt: iTimeStep)
+                    if solution.isImpact {
+                        vA.velocity = solution.velA
+                        vars[m.vA] = vA
+                    }
                 }
             }
         }
@@ -166,6 +173,26 @@ public extension World {
             bodies[i] = body
         }
     }
+    
+    private func integrateVarsClassic(bodies: inout [Body], manifolds: [Manifold], vars: [VarBody]) {
+        for i in 0..<vars.count {
+            let varBody = vars[i]
+
+            var body = bodies[varBody.index]
+            let acceleration = body.applyGravity ? body.acceleration.linear + gravity : body.acceleration.linear
+            
+            let v = varBody.velocity.linear + acceleration * timeStep
+            let w = varBody.velocity.angular + body.acceleration.angular.mul(timeStep)
+            
+            let p = body.transform.position + v * timeStep
+            let a = body.transform.angle + w.mul(timeStep)
+
+            body.stepUpdate(velocity: Velocity(linear: v, angular: w), transform: Transform(position: p, angle: a))
+            
+            bodies[i] = body
+        }
+    }
+    
     
     private func integrateVars(bodies: inout [Body], manifolds: [Manifold], vars: [VarBody]) {
         for i in 0..<vars.count {

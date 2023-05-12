@@ -84,7 +84,7 @@ extension CollisionSolver {
                 }
             }
             
-            if sv < contact_1.penetration {
+            if sv < contact_1.penetration && sv != 0 {
                 let newContact = Contact(point: vert, normal: nv, penetration: sv, count: 1, type: .collide)
                 
                 if newContact.penetration < contact_0.penetration {

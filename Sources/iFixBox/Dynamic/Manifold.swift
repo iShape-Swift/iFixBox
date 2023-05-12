@@ -82,7 +82,7 @@ struct Manifold {
         self.vB = vB
     }
     
-    func resolve(varA: VarBody, varB: VarBody) -> ImpactSolution {
+    func resolve(varA: VarBody, varB: VarBody, iDt: FixFloat) -> ImpactSolution {
         // normal to contact point
         let n = contact.normal
         
@@ -102,7 +102,7 @@ struct Manifold {
         // relative velocity
         let rV1 = aV1 - bV1 + aR.crossProduct(aW1) - bR.crossProduct(bW1)
 
-        let rV1proj = rV1.dotProduct(n)
+        var rV1proj = rV1.dotProduct(n)
         
         // only if getting closer
         guard rV1proj < 0 else {
@@ -110,6 +110,13 @@ struct Manifold {
             return .noImpact
         }
 
+        if contact.penetration < 0 {
+            let l = -contact.penetration
+            let maxBias = l.mul(iDt)
+            let bias = -min(.half, maxBias + 1)
+            rV1proj = min(bias, rV1proj)
+        }
+        
         // -(1 + e)
         let ke = -e - .unit
         
@@ -167,7 +174,7 @@ struct Manifold {
 
     
     // TODO cache some parameters
-    func resolve(varA: VarBody) -> ImpactSolution {
+    func resolve(varA: VarBody, iDt: FixFloat) -> ImpactSolution {
         // Normal is always look at A * <-| * B
         let n = contact.normal
         
@@ -187,11 +194,18 @@ struct Manifold {
         // relative velocity
         let rV1 = aV1 - bV1 + aR.crossProduct(aW1) - bR.crossProduct(bW1)
 
-        let rV1proj = rV1.dotProduct(n)
+        var rV1proj = rV1.dotProduct(n)
         
         // only if getting closer
         guard rV1proj < 0 else {
             return .noImpact
+        }
+        
+        if contact.penetration < 0 {
+            let l = -contact.penetration - 1
+            let maxBias = l.mul(iDt)
+            let bias = -min(.half, maxBias)
+            rV1proj = min(bias, rV1proj)
         }
 
         // -(1 + e)
@@ -291,7 +305,7 @@ struct Manifold {
     }
     
     func possibleVelocity(varA: Velocity) -> FixFloat {
-        return self.possibleVelocity(varA: varA, varB: b.startVel)
+        self.possibleVelocity(varA: varA, varB: b.startVel)
     }
     
 }
