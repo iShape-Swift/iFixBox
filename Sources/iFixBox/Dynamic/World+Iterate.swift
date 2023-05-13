@@ -18,37 +18,48 @@ public extension World {
 
         var bodies = bodyStore.bodies
         
-        var manifolds: [Manifold]
+        var statMans: [StManifold]
+        var dynMans: [DmManifold]
         
         if isDebug {
             let manifoldBundle = prepareManifoldsDebug(bodies: bodies)
-            manifolds = manifoldBundle.manifolds
+            statMans = manifoldBundle.statMans
+            dynMans = manifoldBundle.dynMans
             contacts = manifoldBundle.contacts
         } else {
-            manifolds = prepareManifolds(bodies: bodies)
+            let manifoldBundle = prepareManifolds(bodies: bodies)
+            statMans = manifoldBundle.statMans
+            dynMans = manifoldBundle.dynMans
         }
         
-        let varBundle = prepareVars(manifolds: &manifolds, count: bodies.count)
+        let varBundle = prepareVars(dynMans: &dynMans, statMans: &statMans, bodies: bodies)
         
         var vars = varBundle.vars
         let vSet = varBundle.vSet
         
-        // resolve (can be iterated multiple times)
-        iterateVars(vars: &vars, manifolds: manifolds)
+        if !statMans.isEmpty || !dynMans.isEmpty {
+            // resolve (can be iterated multiple times)
+            iterateVars(vars: &vars, dynMans: dynMans, statMans: statMans)
+        }
 
         // integrate no impacts bodies
         integrateNoImpact(bodies: &bodies, vSet: vSet)
         
         // integrate var bodies
-        integrateVarsClassic(bodies: &bodies, manifolds: manifolds, vars: vars)
+        integrateVarsClassic(bodies: &bodies, vars: vars)
         
         bodyStore.bodies = bodies
     }
     
-    private func prepareManifolds(bodies: [Body]) -> [Manifold] {
-
-        var manifolds = [Manifold]()
-        manifolds.reserveCapacity(16 + (bodies.count >> 16))
+    private func prepareManifolds(bodies: [Body]) -> (dynMans: [DmManifold], statMans: [StManifold]) {
+        
+        var dynMans = [DmManifold]()
+        var statMans = [StManifold]()
+        
+        let capacity = 16 + (bodies.count >> 16)
+        
+        dynMans.reserveCapacity(capacity)
+        statMans.reserveCapacity(capacity)
         
         // find all contacts
         
@@ -60,16 +71,21 @@ public extension World {
                 
                 if a.isDynamic || b.isDynamic {
                     if a.boundary.isCollide(b.boundary) {
-                        if a.isDynamic {
+                        
+                        if a.isDynamic && b.isDynamic {
                             let contact = collisionSolver.collide(a, b)
                             if contact.type != .outside {
-                                manifolds.append(Manifold(a: a, b: b, iA: iA, iB: iB, contact: contact, iTimeStep: iTimeStep))
+                                dynMans.append(DmManifold(a: a, b: b, iA: iA, iB: iB, contact: contact, iTimeStep: iTimeStep))
+                            }
+                        } else if a.isDynamic {
+                            let contact = collisionSolver.collide(a, b)
+                            if contact.type != .outside {
+                                statMans.append(StManifold(a: a, b: b, iA: iA, iB: iB, contact: contact, iTimeStep: iTimeStep))
                             }
                         } else {
-                            // static will be always B
                             let contact = collisionSolver.collide(b, a)
                             if contact.type != .outside {
-                                manifolds.append(Manifold(a: b, b: a, iA: iB, iB: iA, contact: contact, iTimeStep: iTimeStep))
+                                statMans.append(StManifold(a: b, b: a, iA: iB, iB: iA, contact: contact, iTimeStep: iTimeStep))
                             }
                         }
                     }
@@ -77,14 +93,19 @@ public extension World {
             }
         }
         
-        return manifolds
+        return (dynMans, statMans)
     }
     
-    private func prepareManifoldsDebug(bodies: [Body]) -> (manifolds: [Manifold], contacts: [Contact]) {
+    private func prepareManifoldsDebug(bodies: [Body]) -> (dynMans: [DmManifold], statMans: [StManifold], contacts: [Contact]) {
 
-        var manifolds = [Manifold]()
+        var dynMans = [DmManifold]()
+        var statMans = [StManifold]()
         var contacts = [Contact]()
-        manifolds.reserveCapacity(16 + (bodies.count >> 16))
+        
+        let capacity = 16 + (bodies.count >> 16)
+        
+        dynMans.reserveCapacity(capacity)
+        statMans.reserveCapacity(capacity)
         
         // find all contacts
         
@@ -96,17 +117,23 @@ public extension World {
                 
                 if a.isDynamic || b.isDynamic {
                     if a.boundary.isCollide(b.boundary) {
-                        if a.isDynamic {
+                        
+                        if a.isDynamic && b.isDynamic {
                             let contact = collisionSolver.collide(a, b)
                             if contact.type != .outside {
-                                manifolds.append(Manifold(a: a, b: b, iA: iA, iB: iB, contact: contact, iTimeStep: iTimeStep))
+                                dynMans.append(DmManifold(a: a, b: b, iA: iA, iB: iB, contact: contact, iTimeStep: iTimeStep))
+                                contacts.append(contact)
+                            }
+                        } else if a.isDynamic {
+                            let contact = collisionSolver.collide(a, b)
+                            if contact.type != .outside {
+                                statMans.append(StManifold(a: a, b: b, iA: iA, iB: iB, contact: contact, iTimeStep: iTimeStep))
                                 contacts.append(contact)
                             }
                         } else {
-                            // static will be always B
                             let contact = collisionSolver.collide(b, a)
                             if contact.type != .outside {
-                                manifolds.append(Manifold(a: b, b: a, iA: iB, iB: iA, contact: contact, iTimeStep: iTimeStep))
+                                statMans.append(StManifold(a: b, b: a, iA: iB, iB: iA, contact: contact, iTimeStep: iTimeStep))
                                 contacts.append(contact)
                             }
                         }
@@ -115,81 +142,111 @@ public extension World {
             }
         }
         
-        return (manifolds, contacts)
+        return (dynMans, statMans, contacts)
     }
 
-    private func prepareVars(manifolds: inout [Manifold], count: Int) -> VarBundle {
+    private func prepareVars(dynMans: inout [DmManifold], statMans: inout [StManifold], bodies: [Body]) -> VarBundle {
         
+        let count = bodies.count
         var vSet = [Bool](repeating: false, count: count)
         
         var vList = [VarBody]()
-        vList.reserveCapacity(2 * manifolds.count)
+        vList.reserveCapacity(2 * dynMans.count + statMans.count)
         
         var vMap = [Int](repeating: -1, count: count)
         vMap.reserveCapacity(vList.count)
         
-        for i in 0..<manifolds.count {
-            var m = manifolds[i]
-            var vA: Int = -1
-            if m.a.isDynamic {
-                vSet[m.iA] = true
-                vA = vMap[m.iA]
-                if vA < 0 {
-                    vA = vList.count
-                    vMap[m.iA] = vA
-                    vList.append(VarBody(index: m.iA, manifold: i, velocity: m.a.startVel))
-                } else {
-                    let vA = vMap[m.iA]
-                    var v = vList[vA]
-                    v.add(manifold: i)
-                    vList[vA] = v
-                }
+        for i in 0..<dynMans.count {
+            var m = dynMans[i]
+
+            vSet[m.iA] = true
+            vSet[m.iB] = true
+
+            var vA = vMap[m.iA]
+            if vA < 0 {
+                let a = bodies[m.iA]
+                vA = vList.count
+                vMap[m.iA] = vA
+                var v = VarBody(index: m.iA, velocity: a.velocity)
+                v.addDyn(manifold: i)
+                vList.append(v)
+            } else {
+                let vA = vMap[m.iA]
+                var v = vList[vA]
+                v.addDyn(manifold: i)
+                vList[vA] = v
             }
+            
             var vB: Int = -1
-            if m.b.isDynamic {
-                vSet[m.iB] = true
-                vB = vMap[m.iB]
-                if vB < 0 {
-                    vB = vList.count
-                    vMap[m.iB] = vB
-                    vList.append(VarBody(index: m.iB, manifold: i, velocity: m.b.startVel))
-                } else {
-                    let vB = vMap[m.iB]
-                    var v = vList[vB]
-                    v.add(manifold: i)
-                    vList[vB] = v
-                }
+            
+            
+            vB = vMap[m.iB]
+            if vB < 0 {
+                let b = bodies[m.iB]
+                vB = vList.count
+                vMap[m.iB] = vB
+                var v = VarBody(index: m.iA, velocity: b.velocity)
+                v.addDyn(manifold: i)
+                vList.append(VarBody(index: m.iB, velocity: b.velocity))
+            } else {
+                let vB = vMap[m.iB]
+                var v = vList[vB]
+                v.addDyn(manifold: i)
+                vList[vB] = v
             }
-            m.set(vA: vA, vB: vB)
-            manifolds[i] = m
+            
+            m.vA = vA
+            m.vB = vB
+            
+            dynMans[i] = m
+        }
+        
+        for i in 0..<statMans.count {
+            var m = statMans[i]
+
+            vSet[m.iA] = true
+            
+            var vA = vMap[m.iA]
+            if vA < 0 {
+                let a = bodies[m.iA]
+                vA = vList.count
+                vMap[m.iA] = vA
+                vList.append(VarBody(index: m.iA, velocity: a.velocity))
+            } else {
+                let vA = vMap[m.iA]
+                var v = vList[vA]
+                v.addStat(manifold: i)
+                vList[vA] = v
+            }
+            
+            m.vA = vA
+            
+            statMans[i] = m
         }
         
         return VarBundle(vars: vList, vSet: vSet)
     }
     
-    private func iterateVars(vars: inout [VarBody], manifolds: [Manifold]) {
+    private func iterateVars(vars: inout [VarBody], dynMans: [DmManifold], statMans: [StManifold]) {
         for _ in 0..<10 {
-            for m in manifolds {
-                
-                // A can not be static
-                if m.vB >= 0 {
-                    var vA = vars[m.vA]
-                    var vB = vars[m.vB]
-                    let solution = m.resolve(varA: vA, varB: vB)
-                    if solution.isImpact {
-                        vA.velocity = solution.velA
-                        vB.velocity = solution.velB
-                        vars[m.vA] = vA
-                        vars[m.vB] = vB
-                    }
-                } else {
-                    // B is static
-                    var vA = vars[m.vA]
-                    let solution = m.resolve(varA: vA)
-                    if solution.isImpact {
-                        vA.velocity = solution.velA
-                        vars[m.vA] = vA
-                    }
+            for m in dynMans {
+                var vA = vars[m.vA]
+                var vB = vars[m.vB]
+                let solution = m.resolve(varA: vA, varB: vB)
+                if solution.isImpact {
+                    vA.velocity = solution.velA
+                    vB.velocity = solution.velB
+                    vars[m.vA] = vA
+                    vars[m.vB] = vB
+                }
+            }
+            
+            for m in statMans {
+                var vA = vars[m.vA]
+                let solution = m.resolve(varA: vA)
+                if solution.isImpact {
+                    vA.velocity = solution.vel
+                    vars[m.vA] = vA
                 }
             }
         }
@@ -215,7 +272,7 @@ public extension World {
         }
     }
     
-    private func integrateVarsClassic(bodies: inout [Body], manifolds: [Manifold], vars: [VarBody]) {
+    private func integrateVarsClassic(bodies: inout [Body], vars: [VarBody]) {
         for i in 0..<vars.count {
             let varBody = vars[i]
 
@@ -234,7 +291,7 @@ public extension World {
         }
     }
     
-    
+    /*
     private func integrateVars(bodies: inout [Body], manifolds: [Manifold], vars: [VarBody]) {
         for i in 0..<vars.count {
             let varBody = vars[i]
@@ -279,7 +336,8 @@ public extension World {
 
             bodies[varBody.index] = body
         }
+        
     }
-    
+     */
 
 }

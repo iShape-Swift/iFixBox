@@ -21,23 +21,6 @@ struct ImpactSolution {
     let isImpact: Bool
 }
 
-struct VarBody {
-    
-    let index: Int // global index in bodies Array
-    var velocity: Velocity
-    
-    var manifolds: [Int32]
-    
-    init(index: Int, manifold: Int, velocity: Velocity) {
-        self.index = index
-        self.velocity = velocity
-        manifolds = [Int32(manifold)]
-    }
-    
-    mutating func add(manifold: Int) {
-        manifolds.append(Int32(manifold))
-    }
-}
 
 struct LetBody {
 
