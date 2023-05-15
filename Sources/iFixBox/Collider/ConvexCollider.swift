@@ -16,7 +16,7 @@ public struct ConvexCollider {
     public let radius: FixFloat
 
     public var circleCollider: CircleCollider {
-        return CircleCollider(center: center, radius: radius)
+        CircleCollider(center: center, radius: radius)
     }
 
     public init(size: Size) {
@@ -102,16 +102,29 @@ public struct ConvexCollider {
     @inlinable
     public init(transform: Transform, collider: ConvexCollider) {
         let n = collider.points.count
-        var points: [FixVec] = []
-        var normals: [FixVec] = []
+        var points = [FixVec](repeating: .zero, count: n)
+        var normals = [FixVec](repeating: .zero, count: n)
+        
+        var minX = FixFloat.max
+        var maxX = FixFloat.min
+        var minY = FixFloat.max
+        var maxY = FixFloat.min
+        
         for i in 0..<n {
-            points.append(transform.convertAsPoint(collider.points[i]))
-            normals.append(transform.convertAsVector(collider.normals[i]))
+            let p = transform.convertAsPoint(collider.points[i])
+            points[i] = p
+            
+            normals[i] = transform.convertAsVector(collider.normals[i])
+            
+            minX = Swift.min(minX, p.x)
+            maxX = Swift.max(maxX, p.x)
+            minY = Swift.min(minY, p.y)
+            maxY = Swift.max(maxY, p.y)
         }
 
         self.points = points
         self.normals = normals
-        self.boundary = transform.convert(collider.boundary)
+        self.boundary = Boundary(min: FixVec(minX, minY), max: FixVec(maxX, maxY))
         self.center = transform.convertAsPoint(collider.center)
         self.radius = collider.radius
     }

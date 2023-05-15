@@ -13,6 +13,11 @@ public enum Form {
     case polygon
 }
 
+struct Feature {
+    let area: FixFloat
+    let unitInertia: FixFloat
+}
+
 public struct Shape {
 
     public static let empty = Shape(radius: -1)
@@ -22,13 +27,12 @@ public struct Shape {
     public let unitInertia: FixFloat
 
     public var isNotEmpty: Bool {
-        return radius >= 0
+        radius >= 0
     }
 
     public var radius: FixFloat { data0 }
     
     public var size: Size { Size(data0, data1) }
-
 
     private let data0: Int64
     private let data1: Int64
@@ -61,5 +65,25 @@ public struct Shape {
         self.boundary = boundary
         self.area = 0
         self.unitInertia = 0
+    }
+    
+    func calcFeature() -> Feature {
+        let area: FixFloat
+        let unitInertia: FixFloat
+        
+        switch form {
+        case .circle:
+            let rr = radius.sqr
+            area = FixFloat.pi.mul(rr)
+            unitInertia = rr / 2
+        case .rect:
+            area = data0 * data1
+            unitInertia = size.sqrLength.mul(85) // 85 ~= 1024 / 12
+        case .polygon:
+            area = 0
+            unitInertia = 0
+        }
+        
+        return Feature(area: area, unitInertia: unitInertia)
     }
 }

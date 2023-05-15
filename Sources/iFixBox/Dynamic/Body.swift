@@ -57,17 +57,6 @@ public struct Body {
         }
         boundary = transform.convert(shape.boundary)
     }
-//
-//    internal mutating func iterateStatic(timeStep: Int64) {
-//        transform = transform.apply(velocity, timeStep: timeStep)
-//        boundary = transform.convert(shape.boundary)
-//    }
-//
-//    internal mutating func iterateDynamic(timeStep: Int64) {
-//        velocity = velocity.apply(timeStep: timeStep, acceleration: acceleration)
-//        transform = transform.apply(velocity, timeStep: timeStep)
-//        boundary = transform.convert(shape.boundary)
-//    }
 
     public mutating func addForce(force: FixVec, point: FixVec) {
         guard point != transform.position else {

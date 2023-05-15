@@ -42,8 +42,8 @@ extension CollisionSolver {
                 point: circle.center,
                 normal: n1,
                 penetration: delta,
-                count: 1,
-                type: .inside
+                status: .inside,
+                type: .vertex
             )
         }
 
@@ -57,7 +57,7 @@ extension CollisionSolver {
             }
 
             let nB = (circle.center - v1).normalize
-            return Contact(point: v1, normal: nB, penetration: delta, count: 1, type: .collide)
+            return Contact(point: v1, normal: nB, penetration: delta, status: .collide, type: .vertex)
         }
 
         let u2 = (circle.center - v2).dotProduct(v1 - v2)
@@ -68,7 +68,7 @@ extension CollisionSolver {
             }
 
             let nB = (circle.center - v2).normalize
-            return Contact(point: v2, normal: nB, penetration: delta, count: 1, type: .collide)
+            return Contact(point: v2, normal: nB, penetration: delta, status: .collide, type: .vertex)
         }
 
         let faceCenter = v1.middle(v2)
@@ -81,6 +81,6 @@ extension CollisionSolver {
         let dc = (circle.center - v2).dotProduct(n1)
         let m = circle.center - dc * n1
 
-        return Contact(point: m, normal: n1, penetration: delta, count: 1, type: .collide)
+        return Contact(point: m, normal: n1, penetration: delta, status: .collide, type: .vertex)
     }
 }

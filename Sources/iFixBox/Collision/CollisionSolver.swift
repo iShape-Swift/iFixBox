@@ -7,8 +7,10 @@
 
 import iFixFloat
 
-struct CollisionSolver {
+public struct CollisionSolver {
  
+    public init() { }
+    
     func collide(_ a: Body, _ b: Body) -> Contact {
         // Normal is always look at A * <-| * B
         

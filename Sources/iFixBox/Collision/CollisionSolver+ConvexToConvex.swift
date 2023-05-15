@@ -9,7 +9,7 @@ import iFixFloat
 
 extension CollisionSolver {
 
-    func collide(_ a: ConvexCollider, _ b: ConvexCollider, tA: Transform, tB: Transform) -> Contact {
+    public func collide(_ a: ConvexCollider, _ b: ConvexCollider, tA: Transform, tB: Transform) -> Contact {
         if a.points.count > b.points.count {
             let mt = Transform.convertFromBtoA(tB, tA)
             
@@ -25,7 +25,7 @@ extension CollisionSolver {
 
             let contact = collide(a2, b)
             
-            if contact.type != .collide {
+            if contact.status != .collide {
                 return Contact.outside
             }
 
@@ -37,21 +37,21 @@ extension CollisionSolver {
         let cA = findContact(a, b)
         let cB = findContact(b, a)
         
-        if cA.type == .collide && cB.type == .collide {
-            let middle = cA.point.middle(cB.point)
-            let penetration = (cA.penetration + cB.penetration) / 2
-            let count = (cA.count + cB.count) >> 1
-
-            let normal: FixVec
-            if cA.penetration < cB.penetration {
-                normal = cA.normal.negative
+        if cA.status == .collide && cB.status == .collide {
+            if cA.type == cB.type {
+                if cA.penetration < cB.penetration {
+                    return cA.negativeNormal()
+                } else {
+                    return cB
+                }
+            } else if cA.type == .edge {
+                return cA.negativeNormal()
             } else {
-                normal = cB.normal
+                return cB
             }
-            return Contact(point: middle, normal: normal, penetration: penetration, count: count, type: .collide)
-        } else if cB.type == .collide {
+        } else if cB.status == .collide {
             return cB
-        } else if cA.type == .collide {
+        } else if cA.status == .collide {
             return cA.negativeNormal()
         } else {
             return Contact.outside
@@ -59,8 +59,15 @@ extension CollisionSolver {
     }
     
     private func findContact(_ a: ConvexCollider, _ b: ConvexCollider) -> Contact {
-        var contact_0 = Contact(point: FixVec.zero, normal: FixVec.zero, penetration: Int64.max, count: 1, type: .outside)
-        var contact_1 = Contact(point: FixVec.zero, normal: FixVec.zero, penetration: Int64.max, count: 1, type: .outside)
+        var c0_nm = FixVec.zero
+        var c0_pt = FixVec.zero
+        var c0_vi = -1
+        var c0_pn: FixFloat = Int64.max
+        
+
+        var c1_pt = FixVec.zero
+        var c1_vi = -1
+        var c1_pn: FixFloat = Int64.max
         
         for i in 0..<b.points.count {
             let vert = b.points[i]
@@ -84,22 +91,53 @@ extension CollisionSolver {
                 }
             }
             
-            if sv < contact_1.penetration && sv != 0 {
-                let newContact = Contact(point: vert, normal: nv, penetration: sv, count: 1, type: .collide)
-                
-                if newContact.penetration < contact_0.penetration {
-                    contact_0 = newContact
+            if sv < c1_pn {
+                if sv < c0_pn {
+                    c0_pt = vert
+                    c0_nm = nv
+                    c0_pn = sv
+                    c0_vi = i
                 } else {
-                    contact_1 = newContact
+                    c1_pt = vert
+                    c1_pn = sv
+                    c1_vi = i
                 }
             }
         }
         
-        if contact_1.type == .collide {
-            let mid = contact_0.point.middle(contact_1.point)
-            return Contact(point: mid, normal: contact_0.normal, penetration: contact_0.penetration, count: 2, type: .collide)
-        } else if contact_0.type == .collide {
-            return contact_0
+        if c1_vi >= 0 {
+            let n = b.points.count
+            
+            let m = (c0_pt + c1_pt).half
+            
+            var sv: Int64 = Int64.min
+            var nv = FixVec.zero
+            
+            for j in 0..<a.points.count {
+                let n = a.normals[j]
+                let p = a.points[j]
+                
+                let d = m - p
+                let s = n.dotProduct(d)
+                
+                if s > sv {
+                    sv = s
+                    nv = n
+                }
+            }
+
+            let type: ContactType
+            
+            if (c0_vi + 1) % n == c1_vi || (c1_vi + 1) % n == c0_vi  {
+                type = .edge
+            } else {
+                type = .average
+            }
+            
+            return Contact(point: m, normal: nv, penetration: sv, status: .collide, type: type)
+            
+        } else if c0_vi >= 0 {
+            return Contact(point: c0_pt, normal: c0_nm, penetration: c0_pn, status: .collide, type: .vertex)
         } else {
             return .outside
         }

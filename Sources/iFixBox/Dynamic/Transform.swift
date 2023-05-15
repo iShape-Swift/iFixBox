@@ -63,9 +63,9 @@ public struct Transform {
             return boundary.translate(delta: position)
         } else {
             let a0 = boundary.min
-            let a1 = FixVec(a0.x, boundary.max.y)
+            let a1 = FixVec(boundary.min.x, boundary.max.y)
             let a2 = boundary.max
-            let a3 = FixVec(boundary.max.x, a0.y)
+            let a3 = FixVec(boundary.max.x, boundary.max.y)
             
             let b0 = convertAsPoint(a0)
             let b1 = convertAsPoint(a1)
@@ -87,7 +87,7 @@ public struct Transform {
         let point = convertAsPoint(contact.point)
         let normal = convertAsVector(contact.normal)
         
-        return Contact(point: point, normal: normal, penetration: contact.penetration, count: contact.count, type: contact.type)
+        return Contact(point: point, normal: normal, penetration: contact.penetration, status: contact.status, type: contact.type)
     }
     
     @inlinable

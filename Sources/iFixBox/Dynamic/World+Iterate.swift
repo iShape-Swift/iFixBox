@@ -74,17 +74,17 @@ public extension World {
                         
                         if a.isDynamic && b.isDynamic {
                             let contact = collisionSolver.collide(a, b)
-                            if contact.type != .outside {
+                            if contact.status != .outside {
                                 dynMans.append(DmManifold(a: a, b: b, iA: iA, iB: iB, contact: contact, iTimeStep: iTimeStep))
                             }
                         } else if a.isDynamic {
                             let contact = collisionSolver.collide(a, b)
-                            if contact.type != .outside {
+                            if contact.status != .outside {
                                 statMans.append(StManifold(a: a, b: b, iA: iA, iB: iB, contact: contact, iTimeStep: iTimeStep))
                             }
                         } else {
                             let contact = collisionSolver.collide(b, a)
-                            if contact.type != .outside {
+                            if contact.status != .outside {
                                 statMans.append(StManifold(a: b, b: a, iA: iB, iB: iA, contact: contact, iTimeStep: iTimeStep))
                             }
                         }
@@ -120,19 +120,19 @@ public extension World {
                         
                         if a.isDynamic && b.isDynamic {
                             let contact = collisionSolver.collide(a, b)
-                            if contact.type != .outside {
+                            if contact.status != .outside {
                                 dynMans.append(DmManifold(a: a, b: b, iA: iA, iB: iB, contact: contact, iTimeStep: iTimeStep))
                                 contacts.append(contact)
                             }
                         } else if a.isDynamic {
                             let contact = collisionSolver.collide(a, b)
-                            if contact.type != .outside {
+                            if contact.status != .outside {
                                 statMans.append(StManifold(a: a, b: b, iA: iA, iB: iB, contact: contact, iTimeStep: iTimeStep))
                                 contacts.append(contact)
                             }
                         } else {
                             let contact = collisionSolver.collide(b, a)
-                            if contact.type != .outside {
+                            if contact.status != .outside {
                                 statMans.append(StManifold(a: b, b: a, iA: iB, iB: iA, contact: contact, iTimeStep: iTimeStep))
                                 contacts.append(contact)
                             }
@@ -185,9 +185,9 @@ public extension World {
                 let b = bodies[m.iB]
                 vB = vList.count
                 vMap[m.iB] = vB
-                var v = VarBody(index: m.iA, velocity: b.velocity)
+                var v = VarBody(index: m.iB, velocity: b.velocity)
                 v.addDyn(manifold: i)
-                vList.append(VarBody(index: m.iB, velocity: b.velocity))
+                vList.append(v)
             } else {
                 let vB = vMap[m.iB]
                 var v = vList[vB]
@@ -211,7 +211,9 @@ public extension World {
                 let a = bodies[m.iA]
                 vA = vList.count
                 vMap[m.iA] = vA
-                vList.append(VarBody(index: m.iA, velocity: a.velocity))
+                var v = VarBody(index: m.iA, velocity: a.velocity)
+                v.addDyn(manifold: i)
+                vList.append(v)
             } else {
                 let vA = vMap[m.iA]
                 var v = vList[vA]
@@ -287,7 +289,7 @@ public extension World {
 
             body.stepUpdate(velocity: Velocity(linear: v, angular: w), transform: Transform(position: p, angle: a))
             
-            bodies[i] = body
+            bodies[varBody.index] = body
         }
     }
     

@@ -37,8 +37,8 @@ extension CollisionSolver {
                     point: p,
                     normal: nA,
                     penetration: -penetration,
-                    count: 1,
-                    type: .collide
+                    status: .collide,
+                    type: .vertex
                 )
             } else {
                 let p = sqrB > sqrA ? ca : cb
@@ -48,8 +48,8 @@ extension CollisionSolver {
                     point: p,
                     normal: n,
                     penetration: penetration,
-                    count: 1,
-                    type: .inside
+                    status: .inside,
+                    type: .vertex
                 )
             }
         } else {
