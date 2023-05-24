@@ -6,141 +6,150 @@
 //
 
 import iFixFloat
+import iConvex
 
 extension CollisionSolver {
 
     public func collide(_ a: ConvexCollider, _ b: ConvexCollider, tA: Transform, tB: Transform) -> Contact {
+        let isInA = a.points.count > b.points.count
+        let mt: Transform
+        let polyA: [FixVec]
+        let polyB: [FixVec]
+        let bndA: Boundary
+        let bndB: Boundary
+        
         if a.points.count > b.points.count {
-            let mt = Transform.convertFromBtoA(tB, tA)
+            polyA = a.points
+            bndA = a.boundary
             
-            let b2 = ConvexCollider(transform: mt, collider: b)
-
-            let contact = collide(a, b2)
-
-            return tA.convert(contact)
+            mt = Transform.convertFromBtoA(tB, tA)
+            polyB = mt.convertAsPoints(b.points)
+            bndB = Boundary(points: polyB)
         } else {
-            let mt = Transform.convertFromBtoA(tA, tB)
+            polyB = b.points
+            bndB = b.boundary
             
-            let a2 = ConvexCollider(transform: mt, collider: a)
-
-            let contact = collide(a2, b)
-            
-            if contact.status != .collide {
-                return Contact.outside
-            }
-
-            return tB.convert(contact)
+            mt = Transform.convertFromBtoA(tA, tB)
+            polyA = mt.convertAsPoints(a.points)
+            bndA = Boundary(points: polyA)
         }
-    }
-    
-    private func collide(_ a: ConvexCollider, _ b: ConvexCollider) -> Contact {
-        let cA = findContact(a, b)
-        let cB = findContact(b, a)
         
-        if cA.status == .collide && cB.status == .collide {
-            if cA.type == cB.type {
-                if cA.penetration < cB.penetration {
-                    return cA.negativeNormal()
+        let pins = OverlaySolver.find(polyA: polyA, polyB: polyB, bndA: bndA, bndB: bndB)
+
+        var n: FixVec = .zero
+        
+        switch pins.count {
+        case 0, 1:
+            if bndA.isOverlap(bndB) {
+                return self.collide(b.circleCollider, a).negativeNormal()
+            } else if bndB.isOverlap(bndA) {
+                return self.collide(a.circleCollider, b)
+            } else if pins.count == 1 {
+                let pin = pins[0]
+                if pin.mA.offset == 0 && pin.mB.offset == 0 {
+                    // vertex - vertex
+                    n = (b.center - a.center).safeNormalize()
+                } else if pin.mA.offset == 0 {
+                    // vertex is A
+                    let e = b.normals[pin.mB.index].negative
+                    n = isInA ? mt.convertAsVector(e) : e
                 } else {
-                    return cB
+                    // vertex is B
+                    let e = a.normals[pin.mA.index]
+                    n = isInA ? e : mt.convertAsVector(e)
                 }
-            } else if cA.type == .edge {
-                return cA.negativeNormal()
+                let contact = Contact(
+                    point: pin.p,
+                    normal: n,
+                    penetration: 0,
+                    status: .collide,
+                    type: .vertex
+                )
+                
+                return isInA ? tA.convert(contact) : tB.convert(contact)
             } else {
-                return cB
+                return .outside
             }
-        } else if cB.status == .collide {
-            return cB
-        } else if cA.status == .collide {
-            return cA.negativeNormal()
-        } else {
-            return Contact.outside
-        }
-    }
-    
-    private func findContact(_ a: ConvexCollider, _ b: ConvexCollider) -> Contact {
-        var c0_nm = FixVec.zero
-        var c0_pt = FixVec.zero
-        var c0_vi = -1
-        var c0_pn: FixFloat = Int64.max
-        
+        default:
+            let centroid = OverlaySolver.intersect(polyA: polyA, polyB: polyB, pins: pins, bndA: bndA, bndB: bndB)
+            
+            let contact: Contact
+            
+            if pins.count == 2 {
+                let p0 = pins[0]
+                let p1 = pins[1]
+                let ai = MileStone.sameEdgeIndex(polyA.count, m0: p0.mA, m1: p1.mA)
+                let bi = MileStone.sameEdgeIndex(polyB.count, m0: p0.mB, m1: p1.mB)
 
-        var c1_pt = FixVec.zero
-        var c1_vi = -1
-        var c1_pn: FixFloat = Int64.max
-        
-        for i in 0..<b.points.count {
-            let vert = b.points[i]
-            if !a.isContain(vert) {
-                continue
-            }
-            
-            var sv: Int64 = Int64.min
-            var nv = FixVec.zero
-            
-            for j in 0..<a.points.count {
-                let n = a.normals[j]
-                let p = a.points[j]
-                
-                let d = vert - p
-                let s = n.dotProduct(d)
-                
-                if s > sv {
-                    sv = s
-                    nv = n
-                }
-            }
-            
-            if sv < c1_pn {
-                if sv < c0_pn {
-                    c0_pt = vert
-                    c0_nm = nv
-                    c0_pn = sv
-                    c0_vi = i
+                if ai >= 0 && bi >= 0 {
+                    if isInA {
+                        n = a.normals[ai]
+                    } else {
+                        n = b.normals[bi].negative
+                    }
+
+                    contact = Contact(
+                        point: centroid.center,
+                        normal: n,
+                        penetration: 0,
+                        status: .collide,
+                        type: .edge
+                    )
+                } else if ai >= 0 {
+                    if isInA {
+                        n = a.normals[ai]
+                    } else {
+                        n = mt.convertAsVector(a.normals[ai])
+                    }
+                    
+                    contact = Contact(
+                        point: centroid.center,
+                        normal: n,
+                        penetration: 0,
+                        status: .collide,
+                        type: .edge
+                    )
+                } else if bi >= 0 {
+                    if isInA {
+                        n = mt.convertAsVector(b.normals[bi].negative)
+                    } else {
+                        n = b.normals[bi].negative
+                    }
+                    contact = Contact(
+                        point: centroid.center,
+                        normal: n,
+                        penetration: 0,
+                        status: .collide,
+                        type: .edge
+                    )
                 } else {
-                    c1_pt = vert
-                    c1_pn = sv
-                    c1_vi = i
+                    let t = (p0.p - p1.p).safeNormalize()
+                    n = FixVec(t.y, -t.x)
+                    if (b.center - a.center).unsafeDotProduct(n) < 0 {
+                        n = n.negative
+                    }
+
+                    contact = Contact(
+                        point: centroid.center,
+                        normal: n,
+                        penetration: centroid.area > 0 ? -(centroid.area.sqrt >> 1) : 0,
+                        status: .collide,
+                        type: .edge
+                    )
                 }
+            } else {
+                n = (b.center - a.center).safeNormalize()
+                contact = Contact(
+                    point: centroid.center,
+                    normal: n,
+                    penetration: centroid.area > 0 ? -(centroid.area.sqrt >> 1) : 0,
+                    status: .collide,
+                    type: .vertex
+                )
             }
+            
+            return isInA ? tA.convert(contact) : tB.convert(contact)
         }
         
-        if c1_vi >= 0 {
-            let n = b.points.count
-            
-            let m = (c0_pt + c1_pt).half
-            
-            var sv: Int64 = Int64.min
-            var nv = FixVec.zero
-            
-            for j in 0..<a.points.count {
-                let n = a.normals[j]
-                let p = a.points[j]
-                
-                let d = m - p
-                let s = n.dotProduct(d)
-                
-                if s > sv {
-                    sv = s
-                    nv = n
-                }
-            }
-
-            let type: ContactType
-            
-            if (c0_vi + 1) % n == c1_vi || (c1_vi + 1) % n == c0_vi  {
-                type = .edge
-            } else {
-                type = .average
-            }
-            
-            return Contact(point: m, normal: nv, penetration: sv, status: .collide, type: type)
-            
-        } else if c0_vi >= 0 {
-            return Contact(point: c0_pt, normal: c0_nm, penetration: c0_pn, status: .collide, type: .vertex)
-        } else {
-            return .outside
-        }
     }
-       
 }

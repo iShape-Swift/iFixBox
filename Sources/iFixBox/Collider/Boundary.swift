@@ -7,6 +7,9 @@
 
 import iFixFloat
 
+/*
+import iFixFloat
+
 public struct Boundary {
 
     public static let zero = Boundary(min: .zero, max: .zero)
@@ -94,4 +97,18 @@ public struct Boundary {
         return sqrDist <= radius.sqr
     }
 
+}
+*/
+
+extension Boundary {
+    
+    init(size: Size) {
+        let half = size.half
+        self.init(min: half.negative, max: half)
+    }
+    
+    func translate(delta: FixVec) -> Boundary {
+        Boundary(min: min + delta, max: max + delta)
+    }
+    
 }
