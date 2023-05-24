@@ -100,7 +100,7 @@ public struct Boundary {
 }
 */
 
-extension Boundary {
+public extension Boundary {
     
     init(size: Size) {
         let half = size.half

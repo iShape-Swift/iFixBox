@@ -11,6 +11,9 @@ import iConvex
 extension CollisionSolver {
 
     public func collide(_ a: ConvexCollider, _ b: ConvexCollider, tA: Transform, tB: Transform) -> Contact {
+        
+        // Normal is always look at A * <-| * B
+        
         let isInA = a.points.count > b.points.count
         let iMt: Transform
         let dMt: Transform
@@ -44,21 +47,41 @@ extension CollisionSolver {
         switch pins.count {
         case 0, 1:
             if bndA.isOverlap(bndB) {
-                return self.collide(b.circleCollider, a).negativeNormal()
+                n = (tA.position - tB.position).safeNormalize()
+                
+                let contact = Contact(
+                    point: tB.position,
+                    normal: n,
+                    penetration: -b.radius,
+                    status: .inside,
+                    type: .average
+                )
+                
+                return contact
             } else if bndB.isOverlap(bndA) {
-                return self.collide(a.circleCollider, b)
+                n = (tB.position - tA.position).safeNormalize()
+                
+                let contact = Contact(
+                    point: tA.position,
+                    normal: n,
+                    penetration: -a.radius,
+                    status: .inside,
+                    type: .average
+                )
+                
+                return contact
             } else if pins.count == 1 {
                 let pin = pins[0]
                 if pin.mA.offset == 0 && pin.mB.offset == 0 {
                     // vertex - vertex
-                    n = (tB.position - tA.position).safeNormalize()
+                    n = (tA.position - tB.position).safeNormalize()
                 } else if pin.mA.offset == 0 {
                     // vertex is A
-                    let e = b.normals[pin.mB.index].negative
+                    let e = b.normals[pin.mB.index]
                     n = isInA ? iMt.convertAsVector(e) : e
                 } else {
                     // vertex is B
-                    let e = a.normals[pin.mA.index]
+                    let e = a.normals[pin.mA.index].negative
                     n = isInA ? e : iMt.convertAsVector(e)
                 }
                 let contact = Contact(
@@ -84,11 +107,7 @@ extension CollisionSolver {
                 let bi = MileStone.sameEdgeIndex(polyB.count, m0: p0.mB, m1: p1.mB)
 
                 if ai >= 0 && bi >= 0 {
-                    if isInA {
-                        n = a.normals[ai]
-                    } else {
-                        n = b.normals[bi].negative
-                    }
+                    n = a.normals[ai].negative
 
                     let contact = Contact(
                         point: centroid.center,
