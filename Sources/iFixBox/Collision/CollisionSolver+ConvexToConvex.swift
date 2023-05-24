@@ -12,7 +12,8 @@ extension CollisionSolver {
 
     public func collide(_ a: ConvexCollider, _ b: ConvexCollider, tA: Transform, tB: Transform) -> Contact {
         let isInA = a.points.count > b.points.count
-        let mt: Transform
+        let iMt: Transform
+        let dMt: Transform
         let polyA: [FixVec]
         let polyB: [FixVec]
         let bndA: Boundary
@@ -22,15 +23,17 @@ extension CollisionSolver {
             polyA = a.points
             bndA = a.boundary
             
-            mt = Transform.convertFromBtoA(tB, tA)
-            polyB = mt.convertAsPoints(b.points)
+            dMt = tA
+            iMt = Transform.convertFromBtoA(tB, tA)
+            polyB = iMt.convertAsPoints(b.points)
             bndB = Boundary(points: polyB)
         } else {
             polyB = b.points
             bndB = b.boundary
             
-            mt = Transform.convertFromBtoA(tA, tB)
-            polyA = mt.convertAsPoints(a.points)
+            dMt = tB
+            iMt = Transform.convertFromBtoA(tA, tB)
+            polyA = iMt.convertAsPoints(a.points)
             bndA = Boundary(points: polyA)
         }
         
@@ -48,15 +51,15 @@ extension CollisionSolver {
                 let pin = pins[0]
                 if pin.mA.offset == 0 && pin.mB.offset == 0 {
                     // vertex - vertex
-                    n = (b.center - a.center).safeNormalize()
+                    n = (tB.position - tA.position).safeNormalize()
                 } else if pin.mA.offset == 0 {
                     // vertex is A
                     let e = b.normals[pin.mB.index].negative
-                    n = isInA ? mt.convertAsVector(e) : e
+                    n = isInA ? iMt.convertAsVector(e) : e
                 } else {
                     // vertex is B
                     let e = a.normals[pin.mA.index]
-                    n = isInA ? e : mt.convertAsVector(e)
+                    n = isInA ? e : iMt.convertAsVector(e)
                 }
                 let contact = Contact(
                     point: pin.p,
@@ -66,14 +69,13 @@ extension CollisionSolver {
                     type: .vertex
                 )
                 
-                return isInA ? tA.convert(contact) : tB.convert(contact)
+                return dMt.convert(contact)
             } else {
                 return .outside
             }
         default:
             let centroid = OverlaySolver.intersect(polyA: polyA, polyB: polyB, pins: pins, bndA: bndA, bndB: bndB)
-            
-            let contact: Contact
+            let pen = centroid.area > 0 ? -(centroid.area.sqrt >> 1) : 0
             
             if pins.count == 2 {
                 let p0 = pins[0]
@@ -88,67 +90,71 @@ extension CollisionSolver {
                         n = b.normals[bi].negative
                     }
 
-                    contact = Contact(
+                    let contact = Contact(
                         point: centroid.center,
                         normal: n,
-                        penetration: 0,
+                        penetration: pen,
                         status: .collide,
                         type: .edge
                     )
+                    
+                    return dMt.convert(contact)
                 } else if ai >= 0 {
                     if isInA {
                         n = a.normals[ai]
                     } else {
-                        n = mt.convertAsVector(a.normals[ai])
+                        n = iMt.convertAsVector(a.normals[ai])
                     }
                     
-                    contact = Contact(
+                    let contact = Contact(
                         point: centroid.center,
                         normal: n,
-                        penetration: 0,
+                        penetration: pen,
                         status: .collide,
                         type: .edge
                     )
+                    
+                    return dMt.convert(contact)
                 } else if bi >= 0 {
                     if isInA {
-                        n = mt.convertAsVector(b.normals[bi].negative)
+                        n = iMt.convertAsVector(b.normals[bi].negative)
                     } else {
                         n = b.normals[bi].negative
                     }
-                    contact = Contact(
+                    let contact = Contact(
                         point: centroid.center,
                         normal: n,
-                        penetration: 0,
+                        penetration: pen,
                         status: .collide,
                         type: .edge
                     )
+                    
+                    return dMt.convert(contact)
                 } else {
-                    let t = (p0.p - p1.p).safeNormalize()
-                    n = FixVec(t.y, -t.x)
-                    if (b.center - a.center).unsafeDotProduct(n) < 0 {
-                        n = n.negative
-                    }
+                    n = (tB.position - tA.position).safeNormalize()
 
-                    contact = Contact(
-                        point: centroid.center,
+                    let contact = Contact(
+                        point: dMt.convertAsPoint(centroid.center),
                         normal: n,
-                        penetration: centroid.area > 0 ? -(centroid.area.sqrt >> 1) : 0,
+                        penetration: pen,
                         status: .collide,
-                        type: .edge
+                        type: .average
                     )
+                    
+                    return contact
                 }
             } else {
-                n = (b.center - a.center).safeNormalize()
-                contact = Contact(
-                    point: centroid.center,
+                n = (tB.position - tA.position).safeNormalize()
+                let contact = Contact(
+                    point: dMt.convertAsPoint(centroid.center),
                     normal: n,
-                    penetration: centroid.area > 0 ? -(centroid.area.sqrt >> 1) : 0,
+                    penetration: pen,
                     status: .collide,
-                    type: .vertex
+                    type: .average
                 )
+                
+                return contact
             }
-            
-            return isInA ? tA.convert(contact) : tB.convert(contact)
         }
         
     }
