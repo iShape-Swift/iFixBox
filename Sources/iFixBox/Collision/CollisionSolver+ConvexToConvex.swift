@@ -107,7 +107,13 @@ extension CollisionSolver {
                 let bi = MileStone.sameEdgeIndex(polyB.count, m0: p0.mB, m1: p1.mB)
 
                 if ai >= 0 && bi >= 0 {
-                    n = a.normals[ai].negative
+                    
+                    // take "local coord system" normals
+                    if isInA {
+                        n = a.normals[ai].negative
+                    } else {
+                        n = b.normals[bi]
+                    }
 
                     let contact = Contact(
                         point: centroid.center,
@@ -120,9 +126,9 @@ extension CollisionSolver {
                     return dMt.convert(contact)
                 } else if ai >= 0 {
                     if isInA {
-                        n = a.normals[ai]
+                        n = a.normals[ai].negative
                     } else {
-                        n = iMt.convertAsVector(a.normals[ai])
+                        n = iMt.convertAsVector(a.normals[ai].negative)
                     }
                     
                     let contact = Contact(
@@ -136,9 +142,9 @@ extension CollisionSolver {
                     return dMt.convert(contact)
                 } else if bi >= 0 {
                     if isInA {
-                        n = iMt.convertAsVector(b.normals[bi].negative)
+                        n = iMt.convertAsVector(b.normals[bi])
                     } else {
-                        n = b.normals[bi].negative
+                        n = b.normals[bi]
                     }
                     let contact = Contact(
                         point: centroid.center,
@@ -150,7 +156,7 @@ extension CollisionSolver {
                     
                     return dMt.convert(contact)
                 } else {
-                    n = (tB.position - tA.position).safeNormalize()
+                    n = (tA.position - tB.position).safeNormalize()
 
                     let contact = Contact(
                         point: dMt.convertAsPoint(centroid.center),
@@ -163,7 +169,7 @@ extension CollisionSolver {
                     return contact
                 }
             } else {
-                n = (tB.position - tA.position).safeNormalize()
+                n = (tA.position - tB.position).safeNormalize()
                 let contact = Contact(
                     point: dMt.convertAsPoint(centroid.center),
                     normal: n,
