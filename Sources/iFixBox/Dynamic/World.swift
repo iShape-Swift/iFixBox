@@ -18,7 +18,9 @@ public struct World {
     var bodyStore: BodyStore
     //    public GridSpace LandGrid;
     
-    public let timeStep: FixFloat
+    public let posTimeStep: FixFloat
+    public let positionIterations: Int
+    public let velocityIterations: Int
     public let iTimeStep: FixFloat
     public var contacts: [Contact] = []
 
@@ -31,8 +33,10 @@ public struct World {
         bodyStore = BodyStore(capacity: settings.bodyCapacity)
         //        LandGrid = new GridSpace(boundary, settings.GridSpaceFactor, allocator);
         
-        timeStep = settings.timeStep
-        iTimeStep = .unit.div(timeStep)
+        posTimeStep = settings.posTimeStep
+        positionIterations = settings.positionIterations
+        velocityIterations = settings.velocityIterations
+        iTimeStep = .unit.div(posTimeStep)
         collisionSolver = CollisionSolver()
     }
  
@@ -48,8 +52,10 @@ public struct World {
         bodyStore.set(actor: actor)
     }
 
-    public mutating func add(body: Body) -> BodyHandler  {
-        let handler = bodyStore.add(body: body)
+    public mutating func add(body: Body) -> BodyHandler {
+        var newBody = body
+        newBody.boundary = self.boundary(shape: body.shape, transform: body.transform)
+        let handler = bodyStore.add(body: newBody)
 
         // TODO update space grid
 
@@ -58,6 +64,17 @@ public struct World {
     
     public mutating func reset() {
         bodyStore.removeAll()
+    }
+    
+    public func boundary(shape: Shape, transform: Transform) -> Boundary {
+        switch shape.form {
+        case .circle:
+            return Boundary(radius: shape.radius, delta: transform.position)
+        case .rect:
+            return Boundary(size: shape.size, transform: transform)
+        case .polygon:
+            return .zero
+        }
     }
     
 }

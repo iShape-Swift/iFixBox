@@ -15,7 +15,12 @@ public extension World {
     }
     
     mutating func iterate() {
-
+        for _ in 0..<positionIterations {
+            self.posIterate()
+        }
+    }
+    
+    mutating private func posIterate() {
         var bodies = bodyStore.bodies
         
         var statMans: [StManifold]
@@ -50,6 +55,7 @@ public extension World {
         
         bodyStore.bodies = bodies
     }
+    
     
     private func prepareManifolds(bodies: [Body]) -> (dynMans: [DmManifold], statMans: [StManifold]) {
         
@@ -230,7 +236,7 @@ public extension World {
     }
     
     private func iterateVars(vars: inout [VarBody], dynMans: [DmManifold], statMans: [StManifold]) {
-        for _ in 0..<10 {
+        for _ in 0..<velocityIterations {
             for m in dynMans {
                 var vA = vars[m.vA]
                 var vB = vars[m.vB]
@@ -262,13 +268,17 @@ public extension World {
             
             let acceleration = body.applyGravity ? body.acceleration.linear + gravity : body.acceleration.linear
             
-            let v = body.velocity.linear + acceleration * timeStep
-            let w = body.velocity.angular + body.acceleration.angular.mul(timeStep)
+            let v = body.velocity.linear + acceleration * posTimeStep
+            let w = body.velocity.angular + body.acceleration.angular.mul(posTimeStep)
             
-            let p = body.transform.position + v * timeStep
-            let a = body.transform.angle + w.mul(timeStep)
+            let p = body.transform.position + v * posTimeStep
+            let a = body.transform.angle + w.mul(posTimeStep)
 
-            body.stepUpdate(velocity: Velocity(linear: v, angular: w), transform: Transform(position: p, angle: a))
+            let velocity = Velocity(linear: v, angular: w)
+            let transform = Transform(position: p, angle: a)
+            let boundary = self.boundary(shape: body.shape, transform: transform)
+            
+            body.stepUpdate(velocity: velocity, transform: transform, boundary: boundary)
             
             bodies[i] = body
         }
@@ -281,65 +291,20 @@ public extension World {
             var body = bodies[varBody.index]
             let acceleration = body.applyGravity ? body.acceleration.linear + gravity : body.acceleration.linear
             
-            let v = varBody.velocity.linear + acceleration * timeStep
-            let w = varBody.velocity.angular + body.acceleration.angular.mul(timeStep)
+            let v = varBody.velocity.linear + acceleration * posTimeStep
+            let w = varBody.velocity.angular + body.acceleration.angular.mul(posTimeStep)
             
-            let p = body.transform.position + v * timeStep
-            let a = body.transform.angle + w.mul(timeStep)
+            let p = body.transform.position + v * posTimeStep
+            let a = body.transform.angle + w.mul(posTimeStep)
 
-            body.stepUpdate(velocity: Velocity(linear: v, angular: w), transform: Transform(position: p, angle: a))
+            let velocity = Velocity(linear: v, angular: w)
+            let transform = Transform(position: p, angle: a)
+            let boundary = self.boundary(shape: body.shape, transform: transform)
+            
+            body.stepUpdate(velocity: velocity, transform: transform, boundary: boundary)
             
             bodies[varBody.index] = body
         }
     }
-    
-    /*
-    private func integrateVars(bodies: inout [Body], manifolds: [Manifold], vars: [VarBody]) {
-        for i in 0..<vars.count {
-            let varBody = vars[i]
-            var max: FixFloat = .unit
-            for j in varBody.manifolds {
-                let m = manifolds[Int(j)]
-                let k: FixFloat
-                let other = m.other(index: i)
-                if other.index >= 0 {
-                    let otherBody = vars[other.index]
-                    if other.isA {
-                        k = m.possibleVelocity(varA: varBody.velocity, varB: otherBody.velocity)
-                    } else {
-                        k = m.possibleVelocity(varA: otherBody.velocity, varB: varBody.velocity)
-                    }
-                } else {
-                    k = m.possibleVelocity(varA: varBody.velocity)
-                }
-                
-                if k == .zero {
-                    max = 0
-                    break
-                }
-                
-                max = Swift.min(max, k)
-            }
-            
-            let moveLinear = varBody.velocity.linear * max
-            let moveAngular = varBody.velocity.angular.mul(max / 2)
-
-            var body = bodies[varBody.index]
-
-            let p = body.transform.position + moveLinear * timeStep
-            let a = body.transform.angle + moveAngular.mul(timeStep)
-
-            let acceleration = body.applyGravity ? body.acceleration.linear + gravity : body.acceleration.linear
-
-            let v = varBody.velocity.linear + acceleration * timeStep
-            let w = varBody.velocity.angular + body.acceleration.angular.mul(timeStep)
-
-            body.stepUpdate(velocity: Velocity(linear: v, angular: w), transform: Transform(position: p, angle: a))
-
-            bodies[varBody.index] = body
-        }
-        
-    }
-     */
 
 }

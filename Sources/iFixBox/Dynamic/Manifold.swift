@@ -78,7 +78,7 @@ struct Manifold {
         
         if contact.penetration < 0 {
             let l = -contact.penetration
-            let maxBias = l.mul(iTimeStep) + 1
+            let maxBias = l.mul(iTimeStep)
             bias = min(.half, maxBias)
         } else {
             bias = 0

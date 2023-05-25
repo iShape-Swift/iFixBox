@@ -55,7 +55,7 @@ public struct Body {
             unitInertia = shape.unitInertia
             invInertia = .unit.div(fixDouble: unitInertia.mul(mass))
         }
-        boundary = transform.convert(shape.boundary)
+        self.boundary = .zero
     }
 
     public mutating func addForce(force: FixVec, point: FixVec) {
@@ -115,11 +115,11 @@ public struct Body {
         self.velocity = Velocity(linear: self.velocity.linear, angular: self.velocity.angular + velocity)
     }
     
-    internal mutating func stepUpdate(velocity: Velocity, transform: Transform) {
+    internal mutating func stepUpdate(velocity: Velocity, transform: Transform, boundary: Boundary) {
         self.acceleration = .zero
         self.velocity = velocity
         self.transform = transform
-        self.boundary = transform.convert(shape.boundary)
+        self.boundary = boundary
     }
     
 }

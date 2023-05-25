@@ -37,13 +37,13 @@ public struct Shape {
     private let data0: Int64
     private let data1: Int64
 
-    public let boundary: Boundary
+//    public let boundary: Boundary
 
     public init(radius: FixFloat) {
         self.data0 = radius
         self.data1 = -1
         self.form = .circle
-        self.boundary = Boundary(radius: data0)
+//        self.boundary = Boundary(radius: data0)
         let rr = radius.sqr
         self.area = FixFloat.pi.mul(rr)
         self.unitInertia = rr / 2
@@ -53,7 +53,7 @@ public struct Shape {
         self.data0 = size.width
         self.data1 = size.height
         self.form = .rect
-        self.boundary = Boundary(size: size)
+//        self.boundary = Boundary(size: size)
         self.area = size.area
         self.unitInertia = size.sqrLength.mul(85) // 85 ~= 1024 / 12
     }
@@ -62,7 +62,7 @@ public struct Shape {
         self.data0 = index.id
         self.data1 = Int64(index.index)
         self.form = .polygon
-        self.boundary = boundary
+//        self.boundary = boundary
         self.area = 0
         self.unitInertia = 0
     }
