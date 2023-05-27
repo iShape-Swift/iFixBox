@@ -7,7 +7,7 @@
 
 import iFixFloat
 
-extension CollisionSolver {
+public extension CollisionSolver {
     
     func collide(_ a: CircleCollider, _ b: CircleCollider) -> Contact {
         let ca = a.center

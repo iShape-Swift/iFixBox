@@ -59,7 +59,7 @@ extension CollisionSolver {
                 
                 return contact
             } else if bndB.isOverlap(bndA) {
-                n = (tB.position - tA.position).safeNormalize()
+                n = (tA.position - tB.position).safeNormalize()
                 
                 let contact = Contact(
                     point: tA.position,
@@ -98,7 +98,35 @@ extension CollisionSolver {
             }
         default:
             let centroid = OverlaySolver.intersect(polyA: polyA, polyB: polyB, pins: pins, bndA: bndA, bndB: bndB)
-            let pen = centroid.area > 0 ? -(centroid.area.sqrt >> 1) : 0
+            
+            if centroid.area > a.radius.sqr || centroid.area > b.radius.sqr {
+                n = (tA.position - tB.position).safeNormalize()
+                if a.radius > b.radius  {
+                    // A overlap B
+                    
+                    let contact = Contact(
+                        point: tB.position,
+                        normal: n,
+                        penetration: -b.radius,
+                        status: .inside,
+                        type: .average
+                    )
+                    
+                    return contact
+                } else {
+                    // B overlap A
+                    
+                    let contact = Contact(
+                        point: tA.position,
+                        normal: n,
+                        penetration: -a.radius,
+                        status: .inside,
+                        type: .average
+                    )
+                    
+                    return contact
+                }
+            }
             
             if pins.count == 2 {
                 let p0 = pins[0]
@@ -106,6 +134,18 @@ extension CollisionSolver {
                 let ai = MileStone.sameEdgeIndex(polyA.count, m0: p0.mA, m1: p1.mA)
                 let bi = MileStone.sameEdgeIndex(polyB.count, m0: p0.mB, m1: p1.mB)
 
+                let pen: FixFloat
+                if centroid.area > 0 {
+                    let dist = p0.p.distance(p1.p)
+                    if dist != 0 {
+                        pen = -centroid.area.div(2 * dist)
+                    } else {
+                        pen = -centroid.area.sqrt
+                    }
+                } else {
+                    pen = 0
+                }
+                
                 if ai >= 0 && bi >= 0 {
                     
                     // take "local coord system" normals
@@ -114,7 +154,7 @@ extension CollisionSolver {
                     } else {
                         n = b.normals[bi]
                     }
-
+                    
                     let contact = Contact(
                         point: centroid.center,
                         normal: n,
@@ -169,6 +209,7 @@ extension CollisionSolver {
                     return contact
                 }
             } else {
+                let pen = centroid.area > 0 ? -(centroid.area.sqrt >> 1) : 0
                 n = (tA.position - tB.position).safeNormalize()
                 let contact = Contact(
                     point: dMt.convertAsPoint(centroid.center),
@@ -181,6 +222,5 @@ extension CollisionSolver {
                 return contact
             }
         }
-        
     }
 }

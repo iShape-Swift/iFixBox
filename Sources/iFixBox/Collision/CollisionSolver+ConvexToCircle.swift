@@ -7,7 +7,7 @@
 
 import iFixFloat
 
-extension CollisionSolver {
+public extension CollisionSolver {
     
     func collide(_ circle: CircleCollider, _ convex: ConvexCollider) -> Contact {
         var normalIndex = 0
