@@ -44,7 +44,7 @@ public extension World {
         
         if !statMans.isEmpty || !dynMans.isEmpty {
             // resolve (can be iterated multiple times)
-            iterateVars(vars: &vars, dynMans: &dynMans, statMans: &statMans)
+            iterateVars(vars: &vars, dynMans: dynMans, statMans: statMans)
         }
 
         // integrate no impacts bodies
@@ -235,10 +235,9 @@ public extension World {
         return VarBundle(vars: vList, vSet: vSet)
     }
     
-    private func iterateVars(vars: inout [VarBody], dynMans: inout [DmManifold], statMans: inout [StManifold]) {
+    private func iterateVars(vars: inout [VarBody], dynMans: [DmManifold], statMans: [StManifold]) {
         for _ in 0..<velocityIterations {
-            for i in 0..<dynMans.count {
-                var m = dynMans[i]
+            for m in dynMans {
                 var vA = vars[m.vA]
                 var vB = vars[m.vB]
                 let solution = m.resolve(varA: vA, varB: vB)
@@ -247,22 +246,15 @@ public extension World {
                     vB.velocity = solution.velB
                     vars[m.vA] = vA
                     vars[m.vB] = vB
-                    if solution.isModified {
-                        dynMans[i] = m
-                    }
                 }
             }
             
-            for i in 0..<statMans.count {
-                var m = statMans[i]
+            for m in statMans {
                 var vA = vars[m.vA]
                 let solution = m.resolve(varA: vA)
                 if solution.isImpact {
                     vA.velocity = solution.vel
                     vars[m.vA] = vA
-                    if solution.isModified {
-                        statMans[i] = m
-                    }
                 }
             }
         }
@@ -317,21 +309,23 @@ public extension World {
         
         // bias compensation
         for m in dynMans {
-            if m.maxBias > 0 {
+            let solution = m.removeBias()
+            if solution.isImpact {
                 var bodyA = bodies[m.iA]
-                bodyA.update(velocity: bodyA.velocity - m.biasCompA)
+                bodyA.update(velocity: bodyA.velocity + solution.velA)
                 bodies[m.iA] = bodyA
-                
+
                 var bodyB = bodies[m.iB]
-                bodyB.update(velocity: bodyB.velocity + m.biasCompB)
+                bodyB.update(velocity: bodyB.velocity - solution.velB)
                 bodies[m.iB] = bodyB
             }
         }
 
         for m in statMans {
-            if m.maxBias > 0 {
+            let solution = m.removeBias()
+            if solution.isImpact {
                 var bodyA = bodies[m.iA]
-                bodyA.update(velocity: bodyA.velocity - m.biasComp)
+                bodyA.update(velocity: bodyA.velocity + solution.vel)
                 bodies[m.iA] = bodyA
             }
         }

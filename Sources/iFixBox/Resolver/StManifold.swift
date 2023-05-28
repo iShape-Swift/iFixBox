@@ -9,10 +9,9 @@ import iFixFloat
 
 struct StImpactSolution {
     
-    static let noImpact = StImpactSolution(vel: .zero, isImpact: false, isModified: false)
+    static let noImpact = StImpactSolution(vel: .zero, isImpact: false)
     let vel: Velocity
     let isImpact: Bool
-    let isModified: Bool
 }
 
 struct StManifold {
@@ -29,8 +28,6 @@ struct StManifold {
     
     let iA: Int         // global index in bodies Array
     var vA: Int = -1    // index in vars
-    var biasComp: Velocity = .zero
-    var maxBias: FixFloat = 0
 
     let aR: FixVec
     let bR: FixVec
@@ -84,7 +81,7 @@ struct StManifold {
         jDen = a.invMass + b.invMass + aRf.sqr.mul(fixDouble: a.invInertia) + bRf.sqr.mul(fixDouble: b.invInertia)
     }
     
-    mutating func resolve(varA: VarBody) -> StImpactSolution {
+    func resolve(varA: VarBody) -> StImpactSolution {
         // start linear and angular velocity for A and B
         let aV1 = varA.velocity.linear
         let aW1 = varA.velocity.angular
@@ -95,19 +92,11 @@ struct StManifold {
         // relative velocity
         let rV1 = aV1 - bV1 + aR.crossProduct(aW1) - bR.crossProduct(bW1)
 
-        var rV1proj = rV1.dotProduct(n)
+        let rV1proj = rV1.dotProduct(n) - bias
         
         // only if getting closer
-        guard rV1proj < bias else {
+        guard rV1proj < 0 else {
             return .noImpact
-        }
-
-        let biasImpact: FixFloat
-        if rV1proj > -bias {
-            biasImpact = bias - abs(rV1proj)
-            rV1proj = -bias
-        } else {
-            biasImpact = 0
         }
         
         // normal impulse
@@ -145,16 +134,28 @@ struct StManifold {
             adW = adW + aRf.mul(j).mul(fixDouble: invInerA)
         }
         
-        let isModified = maxBias < biasImpact
-        if isModified {
-            maxBias = biasWeight
-            biasComp = Velocity(linear: biasWeight * adV, angular: biasWeight.mul(adW))
-        }
-        
         let aV2 = aV1 + adV
         let aW2 = aW1 + adW
 
-        return StImpactSolution(vel: Velocity(linear: aV2, angular: aW2), isImpact: true, isModified: isModified)
+        return StImpactSolution(vel: Velocity(linear: aV2, angular: aW2), isImpact: true)
+    }
+    
+    
+    func removeBias() -> StImpactSolution {
+        guard bias > 256 else {
+            return .noImpact
+        }
+        
+        let iNum = bias.mul(ke)
+        let i = iNum.div(iDen)
+
+        // new linear velocity
+        let adV = i.mul(invMassA) * n
+        
+        // new angular velocity
+        let adW = aRn.mul(i).mul(fixDouble: invInerA)
+        
+        return StImpactSolution(vel: Velocity(linear: adV, angular: adW), isImpact: true)
     }
     
 }
