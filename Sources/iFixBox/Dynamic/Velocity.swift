@@ -28,4 +28,16 @@ public struct Velocity {
         let dWa = acceleration.angular * timeStep
         return Velocity(linear: linear + dA, angular: angular + dWa)
     }
+    
+    
+    @inlinable
+    static func +(left: Velocity, right: Velocity) -> Velocity {
+        Velocity(linear: left.linear + right.linear, angular: left.angular + right.angular)
+    }
+
+    @inlinable
+    static func -(left: Velocity, right: Velocity) -> Velocity {
+        Velocity(linear: left.linear - right.linear, angular: left.angular - right.angular)
+    }
+    
 }

@@ -11,6 +11,7 @@ struct VarBody {
     
     let index: Int // global index in bodies Array
     var velocity: Velocity
+    var biasComp: FixFloat = .unit
     
     var dynManifolds: [Int32] = []
     var statManifolds: [Int32] = []

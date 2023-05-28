@@ -9,11 +9,12 @@ import iFixFloat
 
 struct DmSolution {
     
-    static let noImpact = DmSolution(velA: .zero, velB: .zero, isImpact: false)
+    static let noImpact = DmSolution(velA: .zero, velB: .zero, isImpact: false, isModified: false)
 
     let velA: Velocity
     let velB: Velocity
     let isImpact: Bool
+    let isModified: Bool
 }
 
 struct DmManifold {
@@ -34,6 +35,9 @@ struct DmManifold {
     
     var vA: Int = -1    // index in vars
     var vB: Int = -1    // index in vars
+    var biasCompA: Velocity = .zero
+    var biasCompB: Velocity = .zero
+    var maxBias: FixFloat = 0
     
     let aR: FixVec
     let bR: FixVec
@@ -65,8 +69,7 @@ struct DmManifold {
         
         if contact.penetration < 0 {
             let l = -contact.penetration
-            let maxBias = l.mul(iTimeStep)
-            bias = min(.half, maxBias)
+            bias = min(.unit, l.mul(iTimeStep))
         } else {
             bias = 0
         }
@@ -90,7 +93,7 @@ struct DmManifold {
         jDen = a.invMass + b.invMass + aRf.sqr.mul(fixDouble: a.invInertia) + bRf.sqr.mul(fixDouble: b.invInertia)
     }
     
-    func resolve(varA: VarBody, varB: VarBody) -> DmSolution {
+    mutating func resolve(varA: VarBody, varB: VarBody) -> DmSolution {
         // start linear and angular velocity for A and B
         let aV1 = varA.velocity.linear
         let aW1 = varA.velocity.angular
@@ -108,7 +111,20 @@ struct DmManifold {
             return .noImpact
         }
         
-        rV1proj = min(rV1proj, -bias)
+        let biasWeight: FixFloat
+        if rV1proj > -bias {
+            if rV1proj > 0 {
+                rV1proj = bias - rV1proj
+                biasWeight = rV1proj.div(bias)
+                rV1proj = -rV1proj
+            } else {
+                biasWeight = .unit
+                rV1proj = -bias
+            }
+        } else {
+            biasWeight = 0
+        }
+
         
         // normal impulse
         // -(1 + e) * rV1 * n / (1 / Ma + 1 / Mb + (aR * t)^2 / aI)
@@ -117,12 +133,12 @@ struct DmManifold {
         let i = iNum.div(iDen)
         
         // new linear velocity
-        var aV2 = aV1 + i.mul(invMassA) * n
-        var bV2 = bV1 - i.mul(invMassB) * n
+        var adV = i.mul(invMassA) * n
+        var bdV = i.mul(invMassB) * n
         
         // new angular velocity
-        var aW2 = aW1 + aRn.mul(i).mul(fixDouble: invInerA)
-        var bW2 = bW1 - bRn.mul(i).mul(fixDouble: invInerB)
+        var adW = aRn.mul(i).mul(fixDouble: invInerA)
+        var bdW = bRn.mul(i).mul(fixDouble: invInerB)
         
         // tangent vector
         // leaving only the component that is parallel to the contact surface
@@ -142,18 +158,33 @@ struct DmManifold {
             j = j.clamp(min: -maxFi, max: maxFi)
             
             // new linear velocity
-            aV2 = aV2 + j.mul(invMassA) * t
-            bV2 = bV2 - j.mul(invMassB) * t
+            adV = adV + j.mul(invMassA) * t
+            bdV = bdV + j.mul(invMassB) * t
             
             // new angular velocity
-            aW2 = aW2 + aRf.mul(j).mul(fixDouble: invInerA)
-            bW2 = bW2 - bRf.mul(j).mul(fixDouble: invInerB)
+            
+            adW += aRf.mul(j).mul(fixDouble: invInerA)
+            bdW += bRf.mul(j).mul(fixDouble: invInerB)
         }
+        
+        let isModified = maxBias < biasWeight
+        if isModified {
+            maxBias = biasWeight
+            biasCompA = Velocity(linear: biasWeight * adV, angular: biasWeight.mul(adW))
+            biasCompB = Velocity(linear: biasWeight * bdV, angular: biasWeight.mul(bdW))
+        }
+
+        let aV2 = aV1 + adV
+        let aW2 = aW1 + adW
+
+        let bV2 = bV1 - bdV
+        let bW2 = bW1 - bdW
         
         return DmSolution(
             velA: Velocity(linear: aV2, angular: aW2),
             velB: Velocity(linear: bV2, angular: bW2),
-            isImpact: true
+            isImpact: true,
+            isModified: isModified
         )
     }
 }

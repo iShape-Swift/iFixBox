@@ -9,10 +9,10 @@ import iFixFloat
 
 struct StImpactSolution {
     
-    static let noImpact = StImpactSolution(vel: .zero, isImpact: false)
-
+    static let noImpact = StImpactSolution(vel: .zero, isImpact: false, isModified: false)
     let vel: Velocity
     let isImpact: Bool
+    let isModified: Bool
 }
 
 struct StManifold {
@@ -28,9 +28,10 @@ struct StManifold {
     let n: FixVec
     
     let iA: Int         // global index in bodies Array
-    
     var vA: Int = -1    // index in vars
-    
+    var biasComp: Velocity = .zero
+    var maxBias: FixFloat = 0
+
     let aR: FixVec
     let bR: FixVec
     let aRn: FixFloat
@@ -56,11 +57,10 @@ struct StManifold {
         // -(1 + e)
         ke = -max(a.material.bounce, b.material.bounce) - .unit
         q = (a.material.friction + b.material.friction) >> 1
-        
+
         if contact.penetration < 0 {
             let l = -contact.penetration
-            let maxBias = l.mul(iTimeStep)
-            bias = min(.half, maxBias)
+            bias = min(.unit, l.mul(iTimeStep))
         } else {
             bias = 0
         }
@@ -84,7 +84,7 @@ struct StManifold {
         jDen = a.invMass + b.invMass + aRf.sqr.mul(fixDouble: a.invInertia) + bRf.sqr.mul(fixDouble: b.invInertia)
     }
     
-    func resolve(varA: VarBody) -> StImpactSolution {
+    mutating func resolve(varA: VarBody) -> StImpactSolution {
         // start linear and angular velocity for A and B
         let aV1 = varA.velocity.linear
         let aW1 = varA.velocity.angular
@@ -101,8 +101,14 @@ struct StManifold {
         guard rV1proj < bias else {
             return .noImpact
         }
-        
-        rV1proj = min(rV1proj, -bias)
+
+        let biasImpact: FixFloat
+        if rV1proj > -bias {
+            biasImpact = bias - abs(rV1proj)
+            rV1proj = -bias
+        } else {
+            biasImpact = 0
+        }
         
         // normal impulse
         // -(1 + e) * rV1 * n / (1 / Ma + (aR * t)^2 / aI)
@@ -111,10 +117,10 @@ struct StManifold {
         let i = iNum.div(iDen)
 
         // new linear velocity
-        var aV2 = aV1 + i.mul(invMassA) * n
+        var adV = i.mul(invMassA) * n
         
         // new angular velocity
-        var aW2 = aW1 + aRn.mul(i).mul(fixDouble: invInerA)
+        var adW = aRn.mul(i).mul(fixDouble: invInerA)
 
         // tangent vector
         // leaving only the component that is parallel to the contact surface
@@ -133,13 +139,22 @@ struct StManifold {
             j = j.clamp(min: -maxFi, max: maxFi)
             
             // new linear velocity
-            aV2 = aV2 + j.mul(invMassA) * t
+            adV = adV + j.mul(invMassA) * t
         
             // new angular velocity
-            aW2 = aW2 + aRf.mul(j).mul(fixDouble: invInerA)
+            adW = adW + aRf.mul(j).mul(fixDouble: invInerA)
         }
+        
+        let isModified = maxBias < biasImpact
+        if isModified {
+            maxBias = biasWeight
+            biasComp = Velocity(linear: biasWeight * adV, angular: biasWeight.mul(adW))
+        }
+        
+        let aV2 = aV1 + adV
+        let aW2 = aW1 + adW
 
-        return StImpactSolution(vel: Velocity(linear: aV2, angular: aW2), isImpact: true)
+        return StImpactSolution(vel: Velocity(linear: aV2, angular: aW2), isImpact: true, isModified: isModified)
     }
     
 }

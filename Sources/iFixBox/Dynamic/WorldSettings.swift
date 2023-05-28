@@ -23,6 +23,7 @@ public struct WorldSettings {
     public let bodyCapacity: Int
     public let freezeMargin: FixFloat
     public let gridSpaceFactor: Int
+    public let stopVel: FixFloat = 64
     
 
     public init(timeStep: FixFloat = 16, velocityIterations: Int = 8, positionIterations: Int = 4, bodyCapacity: Int, freezeMargin: FixFloat = .unit, gridSpaceFactor: Int = 4) {
@@ -51,7 +52,7 @@ public struct WorldSettings {
             self.positionIterations = 8
         }
         
-        self.posTimeStep = 16 / FixFloat(positionIterations)
+        self.posTimeStep = FixFloat(16 / positionIterations)
     }
 
 }

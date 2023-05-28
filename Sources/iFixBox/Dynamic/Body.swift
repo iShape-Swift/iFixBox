@@ -121,5 +121,9 @@ public struct Body {
         self.transform = transform
         self.boundary = boundary
     }
+
+    internal mutating func update(velocity: Velocity) {
+        self.velocity = velocity
+    }
     
 }

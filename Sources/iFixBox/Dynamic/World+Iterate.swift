@@ -44,15 +44,15 @@ public extension World {
         
         if !statMans.isEmpty || !dynMans.isEmpty {
             // resolve (can be iterated multiple times)
-            iterateVars(vars: &vars, dynMans: dynMans, statMans: statMans)
+            iterateVars(vars: &vars, dynMans: &dynMans, statMans: &statMans)
         }
 
         // integrate no impacts bodies
         integrateNoImpact(bodies: &bodies, vSet: vSet)
         
         // integrate var bodies
-        integrateVarsClassic(bodies: &bodies, vars: vars)
-        
+        integrateVars(bodies: &bodies, vars: vars, dynMans: dynMans, statMans: statMans)
+
         bodyStore.bodies = bodies
     }
     
@@ -235,9 +235,10 @@ public extension World {
         return VarBundle(vars: vList, vSet: vSet)
     }
     
-    private func iterateVars(vars: inout [VarBody], dynMans: [DmManifold], statMans: [StManifold]) {
+    private func iterateVars(vars: inout [VarBody], dynMans: inout [DmManifold], statMans: inout [StManifold]) {
         for _ in 0..<velocityIterations {
-            for m in dynMans {
+            for i in 0..<dynMans.count {
+                var m = dynMans[i]
                 var vA = vars[m.vA]
                 var vB = vars[m.vB]
                 let solution = m.resolve(varA: vA, varB: vB)
@@ -246,15 +247,22 @@ public extension World {
                     vB.velocity = solution.velB
                     vars[m.vA] = vA
                     vars[m.vB] = vB
+                    if solution.isModified {
+                        dynMans[i] = m
+                    }
                 }
             }
             
-            for m in statMans {
+            for i in 0..<statMans.count {
+                var m = statMans[i]
                 var vA = vars[m.vA]
                 let solution = m.resolve(varA: vA)
                 if solution.isImpact {
                     vA.velocity = solution.vel
                     vars[m.vA] = vA
+                    if solution.isModified {
+                        statMans[i] = m
+                    }
                 }
             }
         }
@@ -284,7 +292,7 @@ public extension World {
         }
     }
     
-    private func integrateVarsClassic(bodies: inout [Body], vars: [VarBody]) {
+    private func integrateVars(bodies: inout [Body], vars: [VarBody], dynMans: [DmManifold], statMans: [StManifold]) {
         for i in 0..<vars.count {
             let varBody = vars[i]
 
@@ -296,14 +304,36 @@ public extension World {
             
             let p = body.transform.position + v * posTimeStep
             let a = body.transform.angle + w.mul(posTimeStep)
-
-            let velocity = Velocity(linear: v, angular: w)
+            
             let transform = Transform(position: p, angle: a)
             let boundary = self.boundary(shape: body.shape, transform: transform)
             
+            let velocity = Velocity(linear: v, angular: w)
             body.stepUpdate(velocity: velocity, transform: transform, boundary: boundary)
-            
+
             bodies[varBody.index] = body
+        }
+        
+        
+        // bias compensation
+        for m in dynMans {
+            if m.maxBias > 0 {
+                var bodyA = bodies[m.iA]
+                bodyA.update(velocity: bodyA.velocity - m.biasCompA)
+                bodies[m.iA] = bodyA
+                
+                var bodyB = bodies[m.iB]
+                bodyB.update(velocity: bodyB.velocity + m.biasCompB)
+                bodies[m.iB] = bodyB
+            }
+        }
+
+        for m in statMans {
+            if m.maxBias > 0 {
+                var bodyA = bodies[m.iA]
+                bodyA.update(velocity: bodyA.velocity - m.biasComp)
+                bodies[m.iA] = bodyA
+            }
         }
     }
 
