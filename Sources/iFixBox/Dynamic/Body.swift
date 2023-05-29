@@ -53,7 +53,7 @@ public struct Body {
             mass = shape.area.mul(material.density)
             invMass = .unit.div(mass)
             unitInertia = shape.unitInertia
-            invInertia = .unit.div(fixDouble: unitInertia.mul(mass))
+            invInertia = .unit.div(fixDouble: unitInertia.mul(mass).mul(512)) // reduce inertia for more stability
         }
         self.boundary = .zero
     }
