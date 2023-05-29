@@ -185,7 +185,6 @@ public extension World {
             
             var vB: Int = -1
             
-            
             vB = vMap[m.iB]
             if vB < 0 {
                 let b = bodies[m.iB]
@@ -236,44 +235,68 @@ public extension World {
     }
     
     private func iterateVars(vars: inout [VarBody], dynMans: [DmManifold], statMans: [StManifold]) {
+        
+        var dirtVels = [VarVelocity](repeating: .zero, count: vars.count)
+        var biasVels = [VarVelocity](repeating: .zero, count: vars.count)
+        
         for _ in 0..<velocityIterations {
+            
             for m in dynMans {
-                var vA = vars[m.vA]
-                var vB = vars[m.vB]
+                let vA = vars[m.vA]
+                let vB = vars[m.vB]
 
                 let solution = m.resolve(varA: vA, varB: vB)
                 if solution.isImpact {
-                    vA.velocity = solution.velA
-                    vB.velocity = solution.velB
+                    dirtVels[m.vA].add(velocity: solution.velA)
+                    dirtVels[m.vB].add(velocity: solution.velB)
                 }
 
                 let biasSol = m.resolveBias(varA: vA, varB: vB)
                 if biasSol.isImpact {
-                    vA.biasVel = biasSol.velA
-                    vB.biasVel = biasSol.velB
-                }
-
-                if solution.isImpact || biasSol.isImpact {
-                    vars[m.vA] = vA
-                    vars[m.vB] = vB
+                    biasVels[m.vA].add(velocity: biasSol.velA)
+                    biasVels[m.vB].add(velocity: biasSol.velB)
                 }
             }
             
             for m in statMans {
-                var vA = vars[m.vA]
+                let vA = vars[m.vA]
                 let solution = m.resolve(varA: vA)
                 if solution.isImpact {
-                    vA.velocity = solution.vel
+                    dirtVels[m.vA].add(velocity: solution.vel)
                 }
                 
                 let biasSol = m.resolveBias(varA: vA)
                 if biasSol.isImpact {
-                    vA.biasVel = biasSol.vel
+                    biasVels[m.vA].add(velocity: biasSol.vel)
                 }
+            }
+
+            var anyImpact = false
+            
+            for i in 0..<vars.count {
+                var v = vars[i]
+                let dirtVel = dirtVels[i]
+                let biasVel = biasVels[i]
                 
-                if solution.isImpact || biasSol.isImpact {
-                    vars[m.vA] = vA
+                if biasVel.count > 0 || dirtVel.count > 0 {
+                    if dirtVel.count > 0 {
+                        v.velocity = dirtVel.average
+                        dirtVels[i] = .zero
+                    }
+
+                    if biasVel.count > 0 {
+                        v.biasVel = biasVel.average
+                        biasVels[i] = .zero
+                    }
+                    
+                    vars[i] = v
+                    
+                    anyImpact = true
                 }
+            }
+            
+            if !anyImpact {
+                return
             }
         }
     }

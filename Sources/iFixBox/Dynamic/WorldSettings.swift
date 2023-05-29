@@ -8,14 +8,16 @@
 import iFixFloat
 
 public enum SolverPrecision {
-    case rude
+    case low
+    case moderate
     case normal
-    case accurate
+    case high
+    case ultra
 }
 
 public struct WorldSettings {
 
-    public static let `default`: WorldSettings = .init(solverPrecision: .accurate, bodyCapacity: 1024)
+    public static let `default`: WorldSettings = .init(solverPrecision: .ultra, bodyCapacity: 1024)
     
     public let posTimeStep: FixFloat
     public let velocityIterations: Int
@@ -41,14 +43,20 @@ public struct WorldSettings {
         self.gridSpaceFactor = gridSpaceFactor
 
         switch solverPrecision {
-        case .rude:
-            self.velocityIterations = 4
-            self.positionIterations = 2
-        case .normal:
+        case .low:
             self.velocityIterations = 8
+            self.positionIterations = 2
+        case .moderate:
+            self.velocityIterations = 12
             self.positionIterations = 4
-        case .accurate:
+        case .normal:
+            self.velocityIterations = 24
+            self.positionIterations = 4
+        case .high:
             self.velocityIterations = 16
+            self.positionIterations = 8
+        case .ultra:
+            self.velocityIterations = 32
             self.positionIterations = 8
         }
         

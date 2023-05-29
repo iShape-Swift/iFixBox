@@ -30,3 +30,30 @@ struct VarBody {
         dynManifolds.append(Int32(manifold))
     }
 }
+
+struct VarVelocity {
+    
+    static let zero = VarVelocity(velocity: .zero, count: 0)
+    
+    private (set) var velocity: Velocity
+    private (set) var count: Int
+
+    @inlinable
+    mutating func add(velocity v: Velocity) {
+        velocity = velocity + v
+        count += 1
+    }
+    
+    @inlinable
+    var average: Velocity {
+        if count == 1 {
+            return velocity
+        } else {
+            let n = Int64(count)
+            let linear = FixVec(velocity.linear.x / n, velocity.linear.y / n)
+            let angular = velocity.angular / n
+            
+            return Velocity(linear: linear, angular: angular)
+        }
+    }
+}
