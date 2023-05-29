@@ -11,7 +11,7 @@ struct VarBody {
     
     let index: Int // global index in bodies Array
     var velocity: Velocity
-    var biasComp: FixFloat = .unit
+    var biasVel: Velocity
     
     var dynManifolds: [Int32] = []
     var statManifolds: [Int32] = []
@@ -19,6 +19,7 @@ struct VarBody {
     init(index: Int, velocity: Velocity) {
         self.index = index
         self.velocity = velocity
+        self.biasVel = velocity
     }
     
     mutating func addStat(manifold: Int) {

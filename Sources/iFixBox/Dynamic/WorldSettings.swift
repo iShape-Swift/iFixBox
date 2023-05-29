@@ -15,7 +15,7 @@ public enum SolverPrecision {
 
 public struct WorldSettings {
 
-    public static let `default`: WorldSettings = .init(solverPrecision: .normal, bodyCapacity: 1024)
+    public static let `default`: WorldSettings = .init(solverPrecision: .accurate, bodyCapacity: 1024)
     
     public let posTimeStep: FixFloat
     public let velocityIterations: Int

@@ -240,10 +240,20 @@ public extension World {
             for m in dynMans {
                 var vA = vars[m.vA]
                 var vB = vars[m.vB]
+
                 let solution = m.resolve(varA: vA, varB: vB)
                 if solution.isImpact {
                     vA.velocity = solution.velA
                     vB.velocity = solution.velB
+                }
+
+                let biasSol = m.resolveBias(varA: vA, varB: vB)
+                if biasSol.isImpact {
+                    vA.biasVel = biasSol.velA
+                    vB.biasVel = biasSol.velB
+                }
+
+                if solution.isImpact || biasSol.isImpact {
                     vars[m.vA] = vA
                     vars[m.vB] = vB
                 }
@@ -254,6 +264,14 @@ public extension World {
                 let solution = m.resolve(varA: vA)
                 if solution.isImpact {
                     vA.velocity = solution.vel
+                }
+                
+                let biasSol = m.resolveBias(varA: vA)
+                if biasSol.isImpact {
+                    vA.biasVel = biasSol.vel
+                }
+                
+                if solution.isImpact || biasSol.isImpact {
                     vars[m.vA] = vA
                 }
             }
@@ -286,48 +304,29 @@ public extension World {
     
     private func integrateVars(bodies: inout [Body], vars: [VarBody], dynMans: [DmManifold], statMans: [StManifold]) {
         for i in 0..<vars.count {
-            let varBody = vars[i]
+            let v = vars[i]
 
-            var body = bodies[varBody.index]
+            var body = bodies[v.index]
             let acceleration = body.applyGravity ? body.acceleration.linear + gravity : body.acceleration.linear
+
+            // update position, we use bias impact here
             
-            let v = varBody.velocity.linear + acceleration * posTimeStep
-            let w = varBody.velocity.angular + body.acceleration.angular.mul(posTimeStep)
+            let pos = body.transform.position + v.biasVel.linear * posTimeStep
+            let ang = body.transform.angle + v.biasVel.angular.mul(posTimeStep)
             
-            let p = body.transform.position + v * posTimeStep
-            let a = body.transform.angle + w.mul(posTimeStep)
-            
-            let transform = Transform(position: p, angle: a)
+            let transform = Transform(position: pos, angle: ang)
             let boundary = self.boundary(shape: body.shape, transform: transform)
             
-            let velocity = Velocity(linear: v, angular: w)
+            // update velocity, do not include bias here
+            
+            let lin = v.velocity.linear + acceleration * posTimeStep
+            let rot = v.velocity.angular + body.acceleration.angular.mul(posTimeStep)
+            
+            let velocity = Velocity(linear: lin, angular: rot)
+            
             body.stepUpdate(velocity: velocity, transform: transform, boundary: boundary)
 
-            bodies[varBody.index] = body
-        }
-        
-        
-        // bias compensation
-        for m in dynMans {
-            let solution = m.removeBias()
-            if solution.isImpact {
-                var bodyA = bodies[m.iA]
-                bodyA.update(velocity: bodyA.velocity + solution.velA)
-                bodies[m.iA] = bodyA
-
-                var bodyB = bodies[m.iB]
-                bodyB.update(velocity: bodyB.velocity - solution.velB)
-                bodies[m.iB] = bodyB
-            }
-        }
-
-        for m in statMans {
-            let solution = m.removeBias()
-            if solution.isImpact {
-                var bodyA = bodies[m.iA]
-                bodyA.update(velocity: bodyA.velocity + solution.vel)
-                bodies[m.iA] = bodyA
-            }
+            bodies[v.index] = body
         }
     }
 

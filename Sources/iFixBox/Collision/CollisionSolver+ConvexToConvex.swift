@@ -99,7 +99,7 @@ extension CollisionSolver {
         default:
             let centroid = OverlaySolver.intersect(polyA: polyA, polyB: polyB, pins: pins, bndA: bndA, bndB: bndB)
             
-            if centroid.area > a.radius.sqr || centroid.area > b.radius.sqr {
+            if centroid.area > 3 * a.radius.sqr || centroid.area > 3 * b.radius.sqr {
                 n = (tA.position - tB.position).safeNormalize()
                 if a.radius > b.radius  {
                     // A overlap B
@@ -129,84 +129,37 @@ extension CollisionSolver {
             }
             
             if pins.count == 2 {
-                let p0 = pins[0]
-                let p1 = pins[1]
-                let ai = MileStone.sameEdgeIndex(polyA.count, m0: p0.mA, m1: p1.mA)
-                let bi = MileStone.sameEdgeIndex(polyB.count, m0: p0.mB, m1: p1.mB)
-
-                let pen: FixFloat
-                if centroid.area > 0 {
-                    let dist = p0.p.distance(p1.p)
-                    if dist != 0 {
-                        pen = -centroid.area.div(2 * dist)
-                    } else {
-                        pen = -centroid.area.sqrt
-                    }
-                } else {
-                    pen = 0
-                }
+                let p0 = dMt.convertAsPoint(pins[0].p)
+                let p1 = dMt.convertAsPoint(pins[1].p)
                 
-                if ai >= 0 && bi >= 0 {
-                    
-                    // take "local coord system" normals
-                    if isInA {
-                        n = a.normals[ai].negative
-                    } else {
-                        n = b.normals[bi]
-                    }
-                    
-                    let contact = Contact(
-                        point: centroid.center,
-                        normal: n,
-                        penetration: pen,
-                        status: .collide,
-                        type: .edge
-                    )
-                    
-                    return dMt.convert(contact)
-                } else if ai >= 0 {
-                    if isInA {
-                        n = a.normals[ai].negative
-                    } else {
-                        n = iMt.convertAsVector(a.normals[ai].negative)
-                    }
-                    
-                    let contact = Contact(
-                        point: centroid.center,
-                        normal: n,
-                        penetration: pen,
-                        status: .collide,
-                        type: .edge
-                    )
-                    
-                    return dMt.convert(contact)
-                } else if bi >= 0 {
-                    if isInA {
-                        n = iMt.convertAsVector(b.normals[bi])
-                    } else {
-                        n = b.normals[bi]
-                    }
-                    let contact = Contact(
-                        point: centroid.center,
-                        normal: n,
-                        penetration: pen,
-                        status: .collide,
-                        type: .edge
-                    )
-                    
-                    return dMt.convert(contact)
-                } else {
-                    n = (tA.position - tB.position).safeNormalize()
+                if p0 != p1 {
+                    let slice = p0 - p1
+                    let point = dMt.convertAsPoint(centroid.center)
+                    let pen: FixFloat = centroid.area > 0 ? -centroid.area.div(slice.length) : 0
 
+                    n = FixVec(slice.y, -slice.x).normalize
+                    
+                    if n.dotProduct(tA.position - point) < 0 {
+                        n = n.negative
+                    }
+                    
                     let contact = Contact(
-                        point: dMt.convertAsPoint(centroid.center),
+                        point: point,
                         normal: n,
                         penetration: pen,
                         status: .collide,
-                        type: .average
+                        type: .edge
                     )
                     
                     return contact
+                } else {
+                    return Contact(
+                        point: dMt.convertAsPoint(centroid.center),
+                        normal: (tA.position - tB.position).safeNormalize(),
+                        penetration: 0,
+                        status: .collide,
+                        type: .average
+                    )
                 }
             } else {
                 let pen = centroid.area > 0 ? -(centroid.area.sqrt >> 1) : 0

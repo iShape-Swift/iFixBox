@@ -65,7 +65,7 @@ struct DmManifold {
         
         if contact.penetration < 0 {
             let l = -contact.penetration
-            bias = min(.unit, l.mul(iTimeStep))
+            bias = l.mul(iTimeStep)
         } else {
             bias = 0
         }
@@ -100,7 +100,7 @@ struct DmManifold {
         // relative velocity
         let rV1 = aV1 - bV1 + aR.crossProduct(aW1) - bR.crossProduct(bW1)
         
-        let rV1proj = rV1.dotProduct(n) - bias
+        let rV1proj = rV1.dotProduct(n)
         
         // only if getting closer
         guard rV1proj < 0 else {
@@ -161,12 +161,28 @@ struct DmManifold {
         )
     }
     
-    func removeBias() -> DmSolution {
-        guard bias > 256 else {
+    func resolveBias(varA: VarBody, varB: VarBody) -> DmSolution {
+        // start linear and angular velocity for A and B
+        let aV1 = varA.biasVel.linear
+        let aW1 = varA.biasVel.angular
+        
+        let bV1 = varB.biasVel.linear
+        let bW1 = varB.biasVel.angular
+        
+        // relative velocity
+        let rV1 = aV1 - bV1 + aR.crossProduct(aW1) - bR.crossProduct(bW1)
+        
+        let rV1proj = rV1.dotProduct(n) - bias
+        
+        // only if getting closer
+        guard rV1proj < 0 else {
             return .noImpact
         }
         
-        let iNum = bias.mul(ke)
+        // normal impulse
+        // -(1 + e) * rV1 * n / (1 / Ma + 1 / Mb + (aR * t)^2 / aI)
+        
+        let iNum = rV1proj.mul(ke)
         let i = iNum.div(iDen)
         
         // new linear velocity
@@ -177,9 +193,15 @@ struct DmManifold {
         let adW = aRn.mul(i).mul(fixDouble: invInerA)
         let bdW = bRn.mul(i).mul(fixDouble: invInerB)
         
+        let aV2 = aV1 + adV
+        let aW2 = aW1 + adW
+
+        let bV2 = bV1 - bdV
+        let bW2 = bW1 - bdW
+        
         return DmSolution(
-            velA: Velocity(linear: adV, angular: adW),
-            velB: Velocity(linear: bdV, angular: bdW),
+            velA: Velocity(linear: aV2, angular: aW2),
+            velB: Velocity(linear: bV2, angular: bW2),
             isImpact: true
         )
     }
