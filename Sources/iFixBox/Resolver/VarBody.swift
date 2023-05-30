@@ -16,16 +16,19 @@ struct VarBody {
     var dynManifolds: [Int32] = []
     var statManifolds: [Int32] = []
     
+    @inlinable
     init(index: Int, velocity: Velocity) {
         self.index = index
         self.velocity = velocity
         self.biasVel = velocity
     }
     
+    @inlinable
     mutating func addStat(manifold: Int) {
         statManifolds.append(Int32(manifold))
     }
     
+    @inlinable
     mutating func addDyn(manifold: Int) {
         dynManifolds.append(Int32(manifold))
     }

@@ -5,6 +5,8 @@
 //  Created by Nail Sharipov on 12.05.2023.
 //
 
+// https://chrishecker.com/Rigid_Body_Dynamics
+
 import iFixFloat
 
 struct DmSolution {
@@ -43,10 +45,11 @@ struct DmManifold {
     let aRf: FixFloat
     let bRf: FixFloat
     
-    let iDen: FixFloat
+    let invDen: FixFloat
     let jDen: FixFloat
     
-    init(a: Body, b: Body, iA: Int, iB: Int, contact: Contact, iTimeStep: FixFloat) {
+    @inlinable
+    init(a: Body, b: Body, iA: Int, iB: Int, contact: Contact, biasScale: FixFloat) {
         invMassA = a.invMass
         invInerA = a.invInertia
         
@@ -65,7 +68,7 @@ struct DmManifold {
         
         if contact.penetration < 0 {
             let l = -contact.penetration
-            bias = l.mul(iTimeStep)
+            bias = l.mul(biasScale)
         } else {
             bias = 0
         }
@@ -79,7 +82,8 @@ struct DmManifold {
         aRn = aR.crossProduct(n)
         bRn = bR.crossProduct(n)
         
-        iDen = a.invMass + b.invMass + aRn.sqr.mul(fixDouble: a.invInertia) + bRn.sqr.mul(fixDouble: b.invInertia)
+        let iDen = a.invMass + b.invMass + aRn.sqr.mul(fixDouble: a.invInertia) + bRn.sqr.mul(fixDouble: b.invInertia)
+        invDen = .sqrUnit / iDen
         
         let t = FixVec(n.y, -n.x)
         
@@ -89,13 +93,14 @@ struct DmManifold {
         jDen = a.invMass + b.invMass + aRf.sqr.mul(fixDouble: a.invInertia) + bRf.sqr.mul(fixDouble: b.invInertia)
     }
     
-    func resolve(varA: VarBody, varB: VarBody) -> DmSolution {
+    @inlinable
+    func resolve(velA: Velocity, velB: Velocity) -> DmSolution {
         // start linear and angular velocity for A and B
-        let aV1 = varA.velocity.linear
-        let aW1 = varA.velocity.angular
+        let aV1 = velA.linear
+        let aW1 = velA.angular
         
-        let bV1 = varB.velocity.linear
-        let bW1 = varB.velocity.angular
+        let bV1 = velB.linear
+        let bW1 = velB.angular
         
         // relative velocity
         let rV1 = aV1 - bV1 + aR.crossProduct(aW1) - bR.crossProduct(bW1)
@@ -103,7 +108,7 @@ struct DmManifold {
         let rV1proj = rV1.dotProduct(n)
         
         // only if getting closer
-        guard rV1proj < 0 else {
+        guard rV1proj < 0 && invDen != 0 else {
             return .noImpact
         }
         
@@ -111,7 +116,7 @@ struct DmManifold {
         // -(1 + e) * rV1 * n / (1 / Ma + 1 / Mb + (aR * t)^2 / aI)
         
         let iNum = rV1proj.mul(ke)
-        let i = iNum.div(iDen)
+        let i = (iNum * invDen) >> FixFloat.fractionBits
         
         // new linear velocity
         var adV = i.mul(invMassA) * n
@@ -161,13 +166,14 @@ struct DmManifold {
         )
     }
     
-    func resolveBias(varA: VarBody, varB: VarBody) -> DmSolution {
+    @inlinable
+    func resolveBias(velA: Velocity, velB: Velocity) -> DmSolution {
         // start linear and angular velocity for A and B
-        let aV1 = varA.biasVel.linear
-        let aW1 = varA.biasVel.angular
+        let aV1 = velA.linear
+        let aW1 = velA.angular
         
-        let bV1 = varB.biasVel.linear
-        let bW1 = varB.biasVel.angular
+        let bV1 = velB.linear
+        let bW1 = velB.angular
         
         // relative velocity
         let rV1 = aV1 - bV1 + aR.crossProduct(aW1) - bR.crossProduct(bW1)
@@ -175,7 +181,7 @@ struct DmManifold {
         let rV1proj = rV1.dotProduct(n) - bias
         
         // only if getting closer
-        guard rV1proj < 0 else {
+        guard rV1proj < 0 && invDen != 0 else {
             return .noImpact
         }
         
@@ -183,7 +189,7 @@ struct DmManifold {
         // -(1 + e) * rV1 * n / (1 / Ma + 1 / Mb + (aR * t)^2 / aI)
         
         let iNum = rV1proj.mul(ke)
-        let i = iNum.div(iDen)
+        let i = (iNum * invDen) >> FixFloat.fractionBits
         
         // new linear velocity
         let adV = i.mul(invMassA) * n

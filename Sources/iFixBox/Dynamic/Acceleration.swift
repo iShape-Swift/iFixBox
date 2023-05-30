@@ -14,10 +14,12 @@ public struct Acceleration {
     public let linear: FixVec
     public let angular: FixFloat
 
+    @inlinable
     public var isZero: Bool {
-        return linear == .zero && angular == 0
+        linear == .zero && angular == 0
     }
 
+    @inlinable
     public init(linear: FixVec, angular: FixFloat = 0) {
         self.linear = linear
         self.angular = angular

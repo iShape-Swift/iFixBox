@@ -40,7 +40,8 @@ struct StManifold {
     let iDen: FixFloat
     let jDen: FixFloat
     
-    init(a: Body, b: Body, iA: Int, iB: Int, contact: Contact, iTimeStep: FixFloat) {
+    @inlinable
+    init(a: Body, b: Body, iA: Int, iB: Int, contact: Contact, biasScale: FixFloat) {
         invMassA = a.invMass
         invInerA = a.invInertia
         
@@ -57,7 +58,7 @@ struct StManifold {
 
         if contact.penetration < 0 {
             let l = -contact.penetration
-            bias = l.mul(iTimeStep)
+            bias = l.mul(biasScale)
         } else {
             bias = 0
         }
@@ -81,10 +82,11 @@ struct StManifold {
         jDen = a.invMass + b.invMass + aRf.sqr.mul(fixDouble: a.invInertia) + bRf.sqr.mul(fixDouble: b.invInertia)
     }
     
-    func resolve(varA: VarBody) -> StImpactSolution {
+    @inlinable
+    func resolve(velA: Velocity) -> StImpactSolution {
         // start linear and angular velocity for A and B
-        let aV1 = varA.velocity.linear
-        let aW1 = varA.velocity.angular
+        let aV1 = velA.linear
+        let aW1 = velA.angular
 
         let bV1 = velB.linear
         let bW1 = velB.angular
@@ -140,11 +142,11 @@ struct StManifold {
         return StImpactSolution(vel: Velocity(linear: aV2, angular: aW2), isImpact: true)
     }
     
-    
-    func resolveBias(varA: VarBody) -> StImpactSolution {
+    @inlinable
+    func resolveBias(velA: Velocity) -> StImpactSolution {
         // start linear and angular velocity for A and B
-        let aV1 = varA.biasVel.linear
-        let aW1 = varA.biasVel.angular
+        let aV1 = velA.linear
+        let aW1 = velA.angular
 
         let bV1 = velB.linear
         let bW1 = velB.angular

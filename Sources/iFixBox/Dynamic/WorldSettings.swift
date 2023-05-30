@@ -17,7 +17,7 @@ public enum SolverPrecision {
 
 public struct WorldSettings {
 
-    public static let `default`: WorldSettings = .init(solverPrecision: .ultra, bodyCapacity: 1024)
+    public static let `default`: WorldSettings = .init(solverPrecision: .normal, bodyCapacity: 1024)
     
     public let posTimeStep: FixFloat
     public let velocityIterations: Int
@@ -26,18 +26,20 @@ public struct WorldSettings {
     public let freezeMargin: FixFloat
     public let gridSpaceFactor: Int
     public let stopVel: FixFloat = 64
-    
+    public let biasImpact: Int
+   
 
-    public init(timeStep: FixFloat = 16, velocityIterations: Int = 8, positionIterations: Int = 4, bodyCapacity: Int, freezeMargin: FixFloat = .unit, gridSpaceFactor: Int = 4) {
+    public init(timeStep: FixFloat = 16, velocityIterations: Int = 8, positionIterations: Int = 4, bodyCapacity: Int, freezeMargin: FixFloat = .unit, gridSpaceFactor: Int = 4, biasImpact: Int = 8) {
         self.velocityIterations = velocityIterations
         self.positionIterations = positionIterations
         self.bodyCapacity = bodyCapacity
         self.freezeMargin = freezeMargin
         self.gridSpaceFactor = gridSpaceFactor
         self.posTimeStep = FixFloat(16).div(FixFloat(positionIterations))
+        self.biasImpact = biasImpact
     }
     
-    public init(solverPrecision: SolverPrecision = .normal, bodyCapacity: Int, freezeMargin: FixFloat = .unit, gridSpaceFactor: Int = 4) {
+    public init(solverPrecision: SolverPrecision = .normal, bodyCapacity: Int, freezeMargin: FixFloat = .unit, gridSpaceFactor: Int = 4, biasImpact: Int = 8) {
         self.bodyCapacity = bodyCapacity
         self.freezeMargin = freezeMargin
         self.gridSpaceFactor = gridSpaceFactor
@@ -47,10 +49,10 @@ public struct WorldSettings {
             self.velocityIterations = 8
             self.positionIterations = 2
         case .moderate:
-            self.velocityIterations = 12
+            self.velocityIterations = 8
             self.positionIterations = 4
         case .normal:
-            self.velocityIterations = 24
+            self.velocityIterations = 16
             self.positionIterations = 4
         case .high:
             self.velocityIterations = 16
@@ -61,6 +63,7 @@ public struct WorldSettings {
         }
         
         self.posTimeStep = FixFloat(16 / positionIterations)
+        self.biasImpact = biasImpact
     }
 
 }

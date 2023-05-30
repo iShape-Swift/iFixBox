@@ -15,50 +15,7 @@ public extension World {
     }
     
     mutating func iterate() {
-        for _ in 0..<positionIterations {
-            self.posIterate()
-        }
-    }
-    
-    mutating private func posIterate() {
         var bodies = bodyStore.bodies
-        
-        var statMans: [StManifold]
-        var dynMans: [DmManifold]
-        
-        if isDebug {
-            let manifoldBundle = prepareManifoldsDebug(bodies: bodies)
-            statMans = manifoldBundle.statMans
-            dynMans = manifoldBundle.dynMans
-            contacts = manifoldBundle.contacts
-        } else {
-            let manifoldBundle = prepareManifolds(bodies: bodies)
-            statMans = manifoldBundle.statMans
-            dynMans = manifoldBundle.dynMans
-        }
-        
-        let varBundle = prepareVars(dynMans: &dynMans, statMans: &statMans, bodies: bodies)
-        
-        var vars = varBundle.vars
-        let vSet = varBundle.vSet
-        
-        if !statMans.isEmpty || !dynMans.isEmpty {
-            // resolve (can be iterated multiple times)
-            iterateVars(vars: &vars, dynMans: dynMans, statMans: statMans)
-        }
-
-        // integrate no impacts bodies
-        integrateNoImpact(bodies: &bodies, vSet: vSet)
-        
-        // integrate var bodies
-        integrateVars(bodies: &bodies, vars: vars, dynMans: dynMans, statMans: statMans)
-
-        bodyStore.bodies = bodies
-    }
-    
-    
-    private func prepareManifolds(bodies: [Body]) -> (dynMans: [DmManifold], statMans: [StManifold]) {
-        
         var dynMans = [DmManifold]()
         var statMans = [StManifold]()
         
@@ -66,7 +23,41 @@ public extension World {
         
         dynMans.reserveCapacity(capacity)
         statMans.reserveCapacity(capacity)
-        
+
+        for _ in 0..<positionIterations {
+            
+            dynMans.removeAll(keepingCapacity: true)
+            statMans.removeAll(keepingCapacity: true)
+            
+            if isDebug {
+                contacts.removeAll(keepingCapacity: true)
+                prepareManifoldsDebug(bodies: bodies, dynMans: &dynMans, statMans: &statMans, contacts: &contacts)
+            } else {
+                prepareManifolds(bodies: bodies, dynMans: &dynMans, statMans: &statMans)
+            }
+            
+            let varBundle = prepareVars(dynMans: &dynMans, statMans: &statMans, bodies: bodies)
+            
+            var vars = varBundle.vars
+            let vSet = varBundle.vSet
+            
+            if !statMans.isEmpty || !dynMans.isEmpty {
+                // resolve (can be iterated multiple times)
+                iterateVars(vars: &vars, dynMans: dynMans, statMans: statMans)
+            }
+
+            // integrate no impacts bodies
+            integrateNoImpact(bodies: &bodies, vSet: vSet)
+            
+            // integrate var bodies
+            integrateVars(bodies: &bodies, vars: vars, dynMans: dynMans, statMans: statMans)
+
+            bodyStore.bodies = bodies
+        }
+    }
+    
+    
+    private func prepareManifolds(bodies: [Body], dynMans: inout [DmManifold], statMans: inout [StManifold]) {
         // find all contacts
         
         // can be parallelized
@@ -81,38 +72,26 @@ public extension World {
                         if a.isDynamic && b.isDynamic {
                             let contact = collisionSolver.collide(a, b)
                             if contact.status != .outside {
-                                dynMans.append(DmManifold(a: a, b: b, iA: iA, iB: iB, contact: contact, iTimeStep: iTimeStep))
+                                dynMans.append(DmManifold(a: a, b: b, iA: iA, iB: iB, contact: contact, biasScale: biasScale))
                             }
                         } else if a.isDynamic {
                             let contact = collisionSolver.collide(a, b)
                             if contact.status != .outside {
-                                statMans.append(StManifold(a: a, b: b, iA: iA, iB: iB, contact: contact, iTimeStep: iTimeStep))
+                                statMans.append(StManifold(a: a, b: b, iA: iA, iB: iB, contact: contact, biasScale: biasScale))
                             }
                         } else {
                             let contact = collisionSolver.collide(b, a)
                             if contact.status != .outside {
-                                statMans.append(StManifold(a: b, b: a, iA: iB, iB: iA, contact: contact, iTimeStep: iTimeStep))
+                                statMans.append(StManifold(a: b, b: a, iA: iB, iB: iA, contact: contact, biasScale: biasScale))
                             }
                         }
                     }
                 }
             }
         }
-        
-        return (dynMans, statMans)
     }
     
-    private func prepareManifoldsDebug(bodies: [Body]) -> (dynMans: [DmManifold], statMans: [StManifold], contacts: [Contact]) {
-
-        var dynMans = [DmManifold]()
-        var statMans = [StManifold]()
-        var contacts = [Contact]()
-        
-        let capacity = 16 + (bodies.count >> 16)
-        
-        dynMans.reserveCapacity(capacity)
-        statMans.reserveCapacity(capacity)
-        
+    private func prepareManifoldsDebug(bodies: [Body], dynMans: inout [DmManifold], statMans: inout [StManifold], contacts: inout [Contact]) {
         // find all contacts
         
         // can be parallelized
@@ -127,19 +106,19 @@ public extension World {
                         if a.isDynamic && b.isDynamic {
                             let contact = collisionSolver.collide(a, b)
                             if contact.status != .outside {
-                                dynMans.append(DmManifold(a: a, b: b, iA: iA, iB: iB, contact: contact, iTimeStep: iTimeStep))
+                                dynMans.append(DmManifold(a: a, b: b, iA: iA, iB: iB, contact: contact, biasScale: biasScale))
                                 contacts.append(contact)
                             }
                         } else if a.isDynamic {
                             let contact = collisionSolver.collide(a, b)
                             if contact.status != .outside {
-                                statMans.append(StManifold(a: a, b: b, iA: iA, iB: iB, contact: contact, iTimeStep: iTimeStep))
+                                statMans.append(StManifold(a: a, b: b, iA: iA, iB: iB, contact: contact, biasScale: biasScale))
                                 contacts.append(contact)
                             }
                         } else {
                             let contact = collisionSolver.collide(b, a)
                             if contact.status != .outside {
-                                statMans.append(StManifold(a: b, b: a, iA: iB, iB: iA, contact: contact, iTimeStep: iTimeStep))
+                                statMans.append(StManifold(a: b, b: a, iA: iB, iB: iA, contact: contact, biasScale: biasScale))
                                 contacts.append(contact)
                             }
                         }
@@ -147,8 +126,6 @@ public extension World {
                 }
             }
         }
-        
-        return (dynMans, statMans, contacts)
     }
 
     private func prepareVars(dynMans: inout [DmManifold], statMans: inout [StManifold], bodies: [Body]) -> VarBundle {
@@ -236,69 +213,93 @@ public extension World {
     
     private func iterateVars(vars: inout [VarBody], dynMans: [DmManifold], statMans: [StManifold]) {
         
-        var dirtVels = [VarVelocity](repeating: .zero, count: vars.count)
-        var biasVels = [VarVelocity](repeating: .zero, count: vars.count)
+        let dirtVels = UnsafeMutablePointer<VarVelocity>.allocate(capacity: vars.count)
+        dirtVels.initialize(repeating: .zero, count: vars.count)
+
+        let biasVels = UnsafeMutablePointer<VarVelocity>.allocate(capacity: vars.count)
+        biasVels.initialize(repeating: .zero, count: vars.count)
         
-        for _ in 0..<velocityIterations {
+        vars.withUnsafeMutableBufferPointer { vars in
+            var vel = VarVelocity.zero
             
-            for m in dynMans {
-                let vA = vars[m.vA]
-                let vB = vars[m.vB]
-
-                let solution = m.resolve(varA: vA, varB: vB)
-                if solution.isImpact {
-                    dirtVels[m.vA].add(velocity: solution.velA)
-                    dirtVels[m.vB].add(velocity: solution.velB)
-                }
-
-                let biasSol = m.resolveBias(varA: vA, varB: vB)
-                if biasSol.isImpact {
-                    biasVels[m.vA].add(velocity: biasSol.velA)
-                    biasVels[m.vB].add(velocity: biasSol.velB)
-                }
-            }
-            
-            for m in statMans {
-                let vA = vars[m.vA]
-                let solution = m.resolve(varA: vA)
-                if solution.isImpact {
-                    dirtVels[m.vA].add(velocity: solution.vel)
-                }
+            for _ in 0..<velocityIterations {
                 
-                let biasSol = m.resolveBias(varA: vA)
-                if biasSol.isImpact {
-                    biasVels[m.vA].add(velocity: biasSol.vel)
-                }
-            }
-
-            var anyImpact = false
-            
-            for i in 0..<vars.count {
-                var v = vars[i]
-                let dirtVel = dirtVels[i]
-                let biasVel = biasVels[i]
-                
-                if biasVel.count > 0 || dirtVel.count > 0 {
-                    if dirtVel.count > 0 {
-                        v.velocity = dirtVel.average
-                        dirtVels[i] = .zero
-                    }
-
-                    if biasVel.count > 0 {
-                        v.biasVel = biasVel.average
-                        biasVels[i] = .zero
+                for m in dynMans {
+                    let vA = vars[m.vA]
+                    let vB = vars[m.vB]
+                    
+                    let solution = m.resolve(velA: vA.velocity, velB: vB.velocity)
+                    if solution.isImpact {
+                        vel = dirtVels[m.vA]
+                        vel.add(velocity: solution.velA)
+                        dirtVels[m.vA] = vel
+                        
+                        vel = dirtVels[m.vB]
+                        vel.add(velocity: solution.velB)
+                        dirtVels[m.vB] = vel
                     }
                     
-                    vars[i] = v
-                    
-                    anyImpact = true
+                    let biasSol = m.resolveBias(velA: vA.biasVel, velB: vB.biasVel)
+                    if biasSol.isImpact {
+                        vel = biasVels[m.vA]
+                        vel.add(velocity: biasSol.velA)
+                        biasVels[m.vA] = vel
+                        
+                        vel = biasVels[m.vB]
+                        vel.add(velocity: biasSol.velB)
+                        biasVels[m.vB] = vel
+                    }
                 }
-            }
-            
-            if !anyImpact {
-                return
+                
+                for m in statMans {
+                    let vA = vars[m.vA]
+                    let solution = m.resolve(velA: vA.velocity)
+                    if solution.isImpact {
+                        vel = dirtVels[m.vA]
+                        vel.add(velocity: solution.vel)
+                        dirtVels[m.vA] = vel
+                    }
+                    
+                    let biasSol = m.resolveBias(velA: vA.biasVel)
+                    if biasSol.isImpact {
+                        vel = biasVels[m.vA]
+                        vel.add(velocity: biasSol.vel)
+                        biasVels[m.vA] = vel
+                    }
+                }
+                
+                var anyImpact = false
+                
+                for i in 0..<vars.count {
+                    var v = vars[i]
+                    let dirtVel = dirtVels[i]
+                    let biasVel = biasVels[i]
+                    
+                    if biasVel.count > 0 || dirtVel.count > 0 {
+                        if dirtVel.count > 0 {
+                            v.velocity = dirtVel.average
+                            dirtVels[i] = .zero
+                        }
+                        
+                        if biasVel.count > 0 {
+                            v.biasVel = biasVel.average
+                            biasVels[i] = .zero
+                        }
+                        
+                        vars[i] = v
+                        
+                        anyImpact = true
+                    }
+                }
+                
+                if !anyImpact {
+                    return
+                }
             }
         }
+        
+        biasVels.deallocate()
+        dirtVels.deallocate()
     }
     
     private func integrateNoImpact(bodies: inout [Body], vSet: [Bool]) {

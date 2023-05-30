@@ -22,6 +22,7 @@ public struct World {
     public let positionIterations: Int
     public let velocityIterations: Int
     public let iTimeStep: FixFloat
+    public let biasScale: FixFloat
     public var contacts: [Contact] = []
 
     
@@ -37,6 +38,7 @@ public struct World {
         positionIterations = settings.positionIterations
         velocityIterations = settings.velocityIterations
         iTimeStep = .unit.div(posTimeStep)
+        biasScale = iTimeStep / Int64(settings.biasImpact)
         collisionSolver = CollisionSolver()
     }
  
