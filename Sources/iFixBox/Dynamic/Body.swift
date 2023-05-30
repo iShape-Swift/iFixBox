@@ -16,6 +16,7 @@ public struct Body {
     public private (set) var mass: FixFloat
     private (set) var invMass: FixFloat
     private (set) var unitInertia: FixFloat
+    private (set) var inertia: FixFloat
     private (set) var invInertia: FixDouble
 
     public private (set) var shape: Shape
@@ -37,6 +38,7 @@ public struct Body {
         self.shape = Shape.empty
         self.invMass = 0
         self.mass = 0
+        self.inertia = 0
         self.unitInertia = 0
         self.invInertia = 0
         self.velocity = Velocity.zero
@@ -53,7 +55,8 @@ public struct Body {
             mass = shape.area.mul(material.density)
             invMass = .unit.div(mass)
             unitInertia = shape.unitInertia
-            invInertia = .unit.div(fixDouble: unitInertia.mul(mass).mul(512)) // reduce inertia for more stability
+            inertia = unitInertia.mul(mass)
+            invInertia = .unit.div(fixDouble: inertia)
         }
         self.boundary = .zero
     }

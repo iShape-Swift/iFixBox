@@ -5,6 +5,8 @@
 //  Created by Nail Sharipov on 12.05.2023.
 //
 
+// https://chrishecker.com/Rigid_Body_Dynamics
+
 import iFixFloat
 
 struct StImpactSolution {
@@ -15,47 +17,42 @@ struct StImpactSolution {
 }
 
 struct StManifold {
-    
-    let invMassA: FixFloat
-    let invInerA: FixDouble
-    
-    let velB: Velocity
+
+    let bRvw: FixVec
     
     let ke: FixFloat
     let q: FixFloat
     let bias: FixFloat
-    let n: FixVec
+    
+    let n: FixVec       // normal
+    let t: FixVec       // tangent
     
     let iA: Int         // global index in bodies Array
     var vA: Int = -1    // index in vars
 
     let aR: FixVec
-    let bR: FixVec
-    let aRn: FixFloat
-    let bRn: FixFloat
-    
-    let aRf: FixFloat
-    let bRf: FixFloat
-    
-    let iDen: FixFloat
-    let jDen: FixFloat
+
+    let iVa: FixFloat
+    let iWa: FixFloat
+
+    let jVa: FixFloat
+    let jWa: FixFloat
     
     @inlinable
     init(a: Body, b: Body, iA: Int, iB: Int, contact: Contact, biasScale: FixFloat) {
-        invMassA = a.invMass
-        invInerA = a.invInertia
-        
-        velB = b.velocity
-        
         self.iA = iA
         
         // Normal is always look at A * <-| * B
         n = contact.normal
+        t = FixVec(n.y, -n.x)
+        
+        // normal impulse
+        // -(1 + e) * rV1 * n / (1 / Ma + (aR * n)^2 / aI)
         
         // -(1 + e)
         ke = -max(a.material.bounce, b.material.bounce) - .unit
         q = (a.material.friction + b.material.friction) >> 1
-
+        
         if contact.penetration < 0 {
             let l = -contact.penetration
             bias = l.mul(biasScale)
@@ -67,32 +64,30 @@ struct StManifold {
         aR = contact.point - a.transform.position
         
         // distance between center of Mass B to contact point
-        bR = contact.point - b.transform.position
+        let bR = contact.point - b.transform.position
+        bRvw = b.velocity.linear.negative - bR.crossProduct(b.velocity.angular)
+
+        let aRn = aR.crossProduct(n)
+        let aRt = aR.crossProduct(t)
+
+        let i = (ke << FixFloat.cubeFactionBits) / (a.unitInertia + aRn.sqr)
+        let j = (q << FixFloat.cubeFactionBits) / (a.unitInertia + aRt.sqr)
         
-        aRn = aR.crossProduct(n)
-        bRn = bR.crossProduct(n)
-        
-        iDen = a.invMass + b.invMass + aRn.sqr.mul(fixDouble: a.invInertia) + bRn.sqr.mul(fixDouble: b.invInertia)
-        
-        let t = FixVec(n.y, -n.x)
-        
-        aRf = aR.crossProduct(t)
-        bRf = bR.crossProduct(t)
-        
-        jDen = a.invMass + b.invMass + aRf.sqr.mul(fixDouble: a.invInertia) + bRf.sqr.mul(fixDouble: b.invInertia)
+        iVa = (a.unitInertia * i) >> FixFloat.cubeFactionBits
+        iWa = (aRn * i) >> FixFloat.cubeFactionBits
+
+        jVa = (a.unitInertia * j) >> FixFloat.cubeFactionBits
+        jWa = (aRt * j) >> FixFloat.cubeFactionBits
     }
     
     @inlinable
     func resolve(velA: Velocity) -> StImpactSolution {
-        // start linear and angular velocity for A and B
+
         let aV1 = velA.linear
         let aW1 = velA.angular
-
-        let bV1 = velB.linear
-        let bW1 = velB.angular
         
         // relative velocity
-        let rV1 = aV1 - bV1 + aR.crossProduct(aW1) - bR.crossProduct(bW1)
+        let rV1 = aV1 + aR.crossProduct(aW1) + bRvw
 
         let rV1proj = rV1.dotProduct(n)
         
@@ -100,40 +95,25 @@ struct StManifold {
         guard rV1proj < 0 else {
             return .noImpact
         }
-        
-        // normal impulse
-        // -(1 + e) * rV1 * n / (1 / Ma + (aR * t)^2 / aI)
-        
-        let iNum = rV1proj.mul(ke)
-        let i = iNum.div(iDen)
 
-        // new linear velocity
-        var adV = i.mul(invMassA) * n
+        var adV = iVa.mul(rV1proj) * n
+        var adW = iWa.mul(rV1proj)
         
-        // new angular velocity
-        var adW = aRn.mul(i).mul(fixDouble: invInerA)
-
         // tangent vector
-        // leaving only the component that is parallel to the contact surface
-        let f = rV1 - n * rV1proj
-        let sqrF = f.sqrLength
+        let tDot = rV1.dotProduct(t)
 
         // ignore if it to small
-        if sqrF >= 1 {
-            let t = FixVec(n.y, -n.x)
+        if tDot >= 1 {
+            // can not be more then original vel
+            let max = -rV1proj
             
-            let jNum = -rV1.dotProduct(t)
-            var j = jNum.div(jDen)
+            let tV1proj = tDot.clamp(min: -max, max: max).mul(q)
             
-            // can not be more then original impulse
-            let maxFi = i.mul(q)
-            j = j.clamp(min: -maxFi, max: maxFi)
+            let adVt = jVa.mul(tV1proj)
+            let adWt = jWa.mul(tV1proj)
             
-            // new linear velocity
-            adV = adV + j.mul(invMassA) * t
-        
-            // new angular velocity
-            adW = adW + aRf.mul(j).mul(fixDouble: invInerA)
+            adV = adV - adVt * t
+            adW = adW - adWt
         }
         
         let aV2 = aV1 + adV
@@ -144,15 +124,12 @@ struct StManifold {
     
     @inlinable
     func resolveBias(velA: Velocity) -> StImpactSolution {
-        // start linear and angular velocity for A and B
+
         let aV1 = velA.linear
         let aW1 = velA.angular
-
-        let bV1 = velB.linear
-        let bW1 = velB.angular
         
         // relative velocity
-        let rV1 = aV1 - bV1 + aR.crossProduct(aW1) - bR.crossProduct(bW1)
+        let rV1 = aV1 + aR.crossProduct(aW1) + bRvw
 
         let rV1proj = rV1.dotProduct(n) - bias
         
@@ -160,21 +137,9 @@ struct StManifold {
         guard rV1proj < 0 else {
             return .noImpact
         }
-        
-        // normal impulse
-        // -(1 + e) * rV1 * n / (1 / Ma + (aR * t)^2 / aI)
-        
-        let iNum = rV1proj.mul(ke)
-        let i = iNum.div(iDen)
 
-        // new linear velocity
-        let adV = i.mul(invMassA) * n
-        
-        // new angular velocity
-        let adW = aRn.mul(i).mul(fixDouble: invInerA)
-        
-        let aV2 = aV1 + adV
-        let aW2 = aW1 + adW
+        let aV2 = aV1 + iVa.mul(rV1proj) * n
+        let aW2 = aW1 + iWa.mul(rV1proj)
 
         return StImpactSolution(vel: Velocity(linear: aV2, angular: aW2), isImpact: true)
     }

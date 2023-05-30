@@ -19,17 +19,12 @@ struct DmSolution {
 }
 
 struct DmManifold {
-    
-    let invMassA: FixFloat
-    let invInerA: FixDouble
-    
-    let invMassB: FixFloat
-    let invInerB: FixDouble
-    
     let ke: FixFloat
     let q: FixFloat
     let bias: FixFloat
+    
     let n: FixVec
+    let t: FixVec
     
     let iA: Int         // global index in bodies Array
     let iB: Int         // global index in bodies Array
@@ -39,28 +34,34 @@ struct DmManifold {
     
     let aR: FixVec
     let bR: FixVec
+    
     let aRn: FixFloat
     let bRn: FixFloat
     
-    let aRf: FixFloat
-    let bRf: FixFloat
+    let aRt: FixFloat
+    let bRt: FixFloat
     
-    let invDen: FixFloat
-    let jDen: FixFloat
+    let iVa: FixFloat
+    let iVb: FixFloat
+
+    let iWa: FixFloat
+    let iWb: FixFloat
+    
+    let jVa: FixFloat
+    let jVb: FixFloat
+
+    let jWa: FixFloat
+    let jWb: FixFloat
     
     @inlinable
     init(a: Body, b: Body, iA: Int, iB: Int, contact: Contact, biasScale: FixFloat) {
-        invMassA = a.invMass
-        invInerA = a.invInertia
-        
-        invMassB = b.invMass
-        invInerB = b.invInertia
-        
+
         self.iA = iA
         self.iB = iB
         
         // Normal is always look at A * <-| * B
         n = contact.normal
+        t = FixVec(n.y, -n.x)
         
         // -(1 + e)
         ke = -max(a.material.bounce, b.material.bounce) - .unit
@@ -78,19 +79,34 @@ struct DmManifold {
         
         // distance between center of Mass B to contact point
         bR = contact.point - b.transform.position
+
+        let ii = a.unitInertia * b.unitInertia
+        
+        // normal impulse
         
         aRn = aR.crossProduct(n)
         bRn = bR.crossProduct(n)
+
+        let i = (ke << FixFloat.pentaFactionBits) / (ii * (a.mass + b.mass) + aRn.sqr * b.inertia + bRn.sqr * a.inertia)
+
+        iVa = (i * ii.mul(b.mass)) >> FixFloat.tetraFactionBits
+        iVb = (i * ii.mul(a.mass)) >> FixFloat.tetraFactionBits
         
-        let iDen = a.invMass + b.invMass + aRn.sqr.mul(fixDouble: a.invInertia) + bRn.sqr.mul(fixDouble: b.invInertia)
-        invDen = .sqrUnit / iDen
+        iWa = (i * aRn * b.inertia) >> FixFloat.tetraFactionBits
+        iWb = (i * bRn * a.inertia) >> FixFloat.tetraFactionBits
         
-        let t = FixVec(n.y, -n.x)
+        // tangent impulse
         
-        aRf = aR.crossProduct(t)
-        bRf = bR.crossProduct(t)
+        aRt = aR.crossProduct(t)
+        bRt = bR.crossProduct(t)
         
-        jDen = a.invMass + b.invMass + aRf.sqr.mul(fixDouble: a.invInertia) + bRf.sqr.mul(fixDouble: b.invInertia)
+        let j = (.unit << FixFloat.pentaFactionBits) / (ii * (a.mass + b.mass) + aRt.sqr * b.inertia + bRt.sqr * a.inertia)
+
+        jVa = (j * ii.mul(b.mass)) >> FixFloat.tetraFactionBits
+        jVb = (j * ii.mul(a.mass)) >> FixFloat.tetraFactionBits
+        
+        jWa = (j * aRt * b.inertia) >> FixFloat.tetraFactionBits
+        jWb = (j * bRt * a.inertia) >> FixFloat.tetraFactionBits
     }
     
     @inlinable
@@ -108,49 +124,41 @@ struct DmManifold {
         let rV1proj = rV1.dotProduct(n)
         
         // only if getting closer
-        guard rV1proj < 0 && invDen != 0 else {
+        guard rV1proj < 0 else {
             return .noImpact
         }
-        
-        // normal impulse
-        // -(1 + e) * rV1 * n / (1 / Ma + 1 / Mb + (aR * t)^2 / aI)
-        
-        let iNum = rV1proj.mul(ke)
-        let i = (iNum * invDen) >> FixFloat.fractionBits
-        
+
         // new linear velocity
-        var adV = i.mul(invMassA) * n
-        var bdV = i.mul(invMassB) * n
+  
+        var adV = iVa.mul(rV1proj) * n
+        var bdV = iVb.mul(rV1proj) * n
         
         // new angular velocity
-        var adW = aRn.mul(i).mul(fixDouble: invInerA)
-        var bdW = bRn.mul(i).mul(fixDouble: invInerB)
+
+        var adW = iWa.mul(rV1proj)
+        var bdW = iWb.mul(rV1proj)
         
         // tangent vector
-        // leaving only the component that is parallel to the contact surface
-        let f = rV1 - n * rV1proj
-        let sqrF = f.sqrLength
-        
+        let tDot = rV1.dotProduct(t)
+
         // ignore if it to small
-        if sqrF >= 1 {
-            let t = FixVec(n.y, -n.x)
+        if tDot >= 1 {
+            // can not be more then original vel
+            let max = -rV1proj
             
-            let jNum = -rV1.dotProduct(t)
+            let tV1proj = tDot.clamp(min: -max, max: max).mul(q)
             
-            var j = jNum.div(jDen)
+            let adVt = jVa.mul(tV1proj)
+            let adWt = jWa.mul(tV1proj)
+
+            let bdVt = jVb.mul(tV1proj)
+            let bdWt = jWb.mul(tV1proj)
             
-            // can not be more then original impulse
-            let maxFi = i.mul(q)
-            j = j.clamp(min: -maxFi, max: maxFi)
+            adV = adV - adVt * t
+            adW = adW - adWt
             
-            // new linear velocity
-            adV = adV + j.mul(invMassA) * t
-            bdV = bdV + j.mul(invMassB) * t
-            
-            // new angular velocity
-            
-            adW += aRf.mul(j).mul(fixDouble: invInerA)
-            bdW += bRf.mul(j).mul(fixDouble: invInerB)
+            bdV = bdV - bdVt * t
+            bdW = bdW - bdWt
         }
 
         let aV2 = aV1 + adV
@@ -181,29 +189,15 @@ struct DmManifold {
         let rV1proj = rV1.dotProduct(n) - bias
         
         // only if getting closer
-        guard rV1proj < 0 && invDen != 0 else {
+        guard rV1proj < 0 else {
             return .noImpact
         }
         
-        // normal impulse
-        // -(1 + e) * rV1 * n / (1 / Ma + 1 / Mb + (aR * t)^2 / aI)
-        
-        let iNum = rV1proj.mul(ke)
-        let i = (iNum * invDen) >> FixFloat.fractionBits
-        
-        // new linear velocity
-        let adV = i.mul(invMassA) * n
-        let bdV = i.mul(invMassB) * n
-        
-        // new angular velocity
-        let adW = aRn.mul(i).mul(fixDouble: invInerA)
-        let bdW = bRn.mul(i).mul(fixDouble: invInerB)
-        
-        let aV2 = aV1 + adV
-        let aW2 = aW1 + adW
+        let aV2 = aV1 + iVa.mul(rV1proj) * n
+        let aW2 = aW1 + iWa.mul(rV1proj)
 
-        let bV2 = bV1 - bdV
-        let bW2 = bW1 - bdW
+        let bV2 = bV1 - iVb.mul(rV1proj) * n
+        let bW2 = bW1 - iWb.mul(rV1proj)
         
         return DmSolution(
             velA: Velocity(linear: aV2, angular: aW2),
