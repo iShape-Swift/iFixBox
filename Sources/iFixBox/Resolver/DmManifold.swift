@@ -64,7 +64,7 @@ struct DmManifold {
         t = FixVec(n.y, -n.x)
         
         // -(1 + e)
-        ke = -max(a.material.bounce, b.material.bounce) - .unit
+        ke = max(a.material.bounce, b.material.bounce) + .unit
         q = (a.material.friction + b.material.friction) >> 1
         
         if contact.penetration < 0 {
@@ -89,11 +89,11 @@ struct DmManifold {
 
         let i = (ke << FixFloat.pentaFactionBits) / (ii * (a.mass + b.mass) + aRn.sqr * b.inertia + bRn.sqr * a.inertia)
 
-        iVa = (i * ii.mul(b.mass)) >> FixFloat.tetraFactionBits
-        iVb = (i * ii.mul(a.mass)) >> FixFloat.tetraFactionBits
+        iVa = -((i * ii.mul(b.mass)) >> FixFloat.tetraFactionBits)
+        iVb = -((i * ii.mul(a.mass)) >> FixFloat.tetraFactionBits)
         
-        iWa = (i * aRn * b.inertia) >> FixFloat.tetraFactionBits
-        iWb = (i * bRn * a.inertia) >> FixFloat.tetraFactionBits
+        iWa = -((i * aRn * b.inertia) >> FixFloat.tetraFactionBits)
+        iWb = -((i * bRn * a.inertia) >> FixFloat.tetraFactionBits)
         
         // tangent impulse
         
@@ -102,11 +102,11 @@ struct DmManifold {
         
         let j = (.unit << FixFloat.pentaFactionBits) / (ii * (a.mass + b.mass) + aRt.sqr * b.inertia + bRt.sqr * a.inertia)
 
-        jVa = (j * ii.mul(b.mass)) >> FixFloat.tetraFactionBits
-        jVb = (j * ii.mul(a.mass)) >> FixFloat.tetraFactionBits
+        jVa = -((j * ii.mul(b.mass)) >> FixFloat.tetraFactionBits)
+        jVb = -((j * ii.mul(a.mass)) >> FixFloat.tetraFactionBits)
         
-        jWa = (j * aRt * b.inertia) >> FixFloat.tetraFactionBits
-        jWb = (j * bRt * a.inertia) >> FixFloat.tetraFactionBits
+        jWa = -((j * aRt * b.inertia) >> FixFloat.tetraFactionBits)
+        jWb = -((j * bRt * a.inertia) >> FixFloat.tetraFactionBits)
     }
     
     @inlinable
@@ -149,11 +149,11 @@ struct DmManifold {
             
             let tV1 = tV1Dot.clamp(min: min, max: max).mul(q)
             
-            let adVt = -jVa.mul(tV1)
-            let adWt = -jWa.mul(tV1)
+            let adVt = jVa.mul(tV1)
+            let adWt = jWa.mul(tV1)
 
-            let bdVt = -jVb.mul(tV1)
-            let bdWt = -jWb.mul(tV1)
+            let bdVt = jVb.mul(tV1)
+            let bdWt = jWb.mul(tV1)
             
             adV = adV + adVt * t
             adW = adW + adWt

@@ -50,7 +50,7 @@ struct StManifold {
         // -(1 + e) * rV1 * n / (1 / Ma + (aR * n)^2 / aI)
         
         // -(1 + e)
-        ke = -max(a.material.bounce, b.material.bounce) - .unit
+        ke = max(a.material.bounce, b.material.bounce) + .unit
         q = (a.material.friction + b.material.friction) >> 1
         
         if contact.penetration < 0 {
@@ -73,11 +73,11 @@ struct StManifold {
         let i = (ke << FixFloat.cubeFactionBits) / (a.unitInertia + aRn.sqr)
         let j = (q << FixFloat.cubeFactionBits) / (a.unitInertia + aRt.sqr)
         
-        iVa = (a.unitInertia * i) >> FixFloat.cubeFactionBits
-        iWa = (aRn * i) >> FixFloat.cubeFactionBits
+        iVa = -((a.unitInertia * i) >> FixFloat.cubeFactionBits)
+        iWa = -((aRn * i) >> FixFloat.cubeFactionBits)
 
-        jVa = (a.unitInertia * j) >> FixFloat.cubeFactionBits
-        jWa = (aRt * j) >> FixFloat.cubeFactionBits
+        jVa = -((a.unitInertia * j) >> FixFloat.cubeFactionBits)
+        jWa = -((aRt * j) >> FixFloat.cubeFactionBits)
     }
     
     @inlinable
@@ -110,8 +110,8 @@ struct StManifold {
             
             let tV1 = tV1Dot.clamp(min: min, max: max).mul(q)
             
-            let adVt = -jVa.mul(tV1)
-            let adWt = -jWa.mul(tV1)
+            let adVt = jVa.mul(tV1)
+            let adWt = jWa.mul(tV1)
             
             adV = adV + adVt * t
             adW = adW + adWt
