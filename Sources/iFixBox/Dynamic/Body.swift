@@ -17,7 +17,6 @@ public struct Body {
     private (set) var invMass: FixFloat
     private (set) var unitInertia: FixFloat
     private (set) var inertia: FixFloat
-    private (set) var invInertia: FixDouble
 
     public private (set) var shape: Shape
     public private (set) var material: Material
@@ -40,7 +39,6 @@ public struct Body {
         self.mass = 0
         self.inertia = 0
         self.unitInertia = 0
-        self.invInertia = 0
         self.velocity = Velocity.zero
         self.transform = transform
         self.boundary = Boundary.zero
@@ -56,7 +54,6 @@ public struct Body {
             invMass = .unit.div(mass)
             unitInertia = shape.unitInertia
             inertia = unitInertia.mul(mass)
-            invInertia = .unit.div(fixDouble: inertia)
         }
         self.boundary = .zero
     }
@@ -72,7 +69,7 @@ public struct Body {
         let projF = force.dotProduct(n)
         let a = projF.mul(invMass) * n
         let moment = force.crossProduct(r)
-        let wa = moment.mul(fixDouble: invInertia)
+        let wa = moment.div(inertia)
 
         acceleration = Acceleration(linear: acceleration.linear + a, angular: acceleration.angular + wa)
     }

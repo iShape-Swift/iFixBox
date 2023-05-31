@@ -212,6 +212,7 @@ public extension World {
     }
     
     private func iterateVars(vars: inout [VarBody], dynMans: [DmManifold], statMans: [StManifold]) {
+        let stabilization = self.impactStabilization
         
         let dirtVels = UnsafeMutablePointer<VarVelocity>.allocate(capacity: vars.count)
         dirtVels.initialize(repeating: .zero, count: vars.count)
@@ -277,12 +278,12 @@ public extension World {
                     
                     if biasVel.count > 0 || dirtVel.count > 0 {
                         if dirtVel.count > 0 {
-                            v.velocity = dirtVel.average
+                            v.velocity = dirtVel.average(impactStabilization: stabilization)
                             dirtVels[i] = .zero
                         }
                         
                         if biasVel.count > 0 {
-                            v.biasVel = biasVel.average
+                            v.biasVel = biasVel.average(impactStabilization: stabilization)
                             biasVels[i] = .zero
                         }
                         

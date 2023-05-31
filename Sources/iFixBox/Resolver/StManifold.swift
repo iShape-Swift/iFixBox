@@ -89,31 +89,32 @@ struct StManifold {
         // relative velocity
         let rV1 = aV1 + aR.crossProduct(aW1) + bRvw
 
-        let rV1proj = rV1.dotProduct(n)
+        let rV1dot = rV1.dotProduct(n)
         
         // only if getting closer
-        guard rV1proj < 0 else {
+        guard rV1dot < 0 else {
             return .noImpact
         }
 
-        var adV = iVa.mul(rV1proj) * n
-        var adW = iWa.mul(rV1proj)
+        var adV = iVa.mul(rV1dot) * n
+        var adW = iWa.mul(rV1dot)
         
         // tangent vector
-        let tDot = rV1.dotProduct(t)
-
+        let tV1Dot = rV1.dotProduct(t)
+        
         // ignore if it to small
-        if tDot >= 1 {
+        if tV1Dot != 0 {
             // can not be more then original vel
-            let max = -rV1proj
+            let min = rV1dot
+            let max = -rV1dot
             
-            let tV1proj = tDot.clamp(min: -max, max: max).mul(q)
+            let tV1 = tV1Dot.clamp(min: min, max: max).mul(q)
             
-            let adVt = jVa.mul(tV1proj)
-            let adWt = jWa.mul(tV1proj)
+            let adVt = -jVa.mul(tV1)
+            let adWt = -jWa.mul(tV1)
             
-            adV = adV - adVt * t
-            adW = adW - adWt
+            adV = adV + adVt * t
+            adW = adW + adWt
         }
         
         let aV2 = aV1 + adV
@@ -131,15 +132,15 @@ struct StManifold {
         // relative velocity
         let rV1 = aV1 + aR.crossProduct(aW1) + bRvw
 
-        let rV1proj = rV1.dotProduct(n) - bias
+        let rV1dot = rV1.dotProduct(n) - bias
         
         // only if getting closer
-        guard rV1proj < 0 else {
+        guard rV1dot < 0 else {
             return .noImpact
         }
 
-        let aV2 = aV1 + iVa.mul(rV1proj) * n
-        let aW2 = aW1 + iWa.mul(rV1proj)
+        let aV2 = aV1 + iVa.mul(rV1dot) * n
+        let aW2 = aW1 + iWa.mul(rV1dot)
 
         return StImpactSolution(vel: Velocity(linear: aV2, angular: aW2), isImpact: true)
     }

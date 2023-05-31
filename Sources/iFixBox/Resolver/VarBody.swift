@@ -48,13 +48,13 @@ struct VarVelocity {
     }
     
     @inlinable
-    var average: Velocity {
+    func average(impactStabilization: Int64) -> Velocity {
         if count == 1 {
             return velocity
         } else {
-            let n = Int64(count)
-            let linear = FixVec(velocity.linear.x / n, velocity.linear.y / n)
-            let angular = velocity.angular / n
+            let k = FixFloat.unit / Int64(count) - impactStabilization
+            let linear = k * FixVec(velocity.linear.x, velocity.linear.y)
+            let angular = velocity.angular.mul(k)
             
             return Velocity(linear: linear, angular: angular)
         }

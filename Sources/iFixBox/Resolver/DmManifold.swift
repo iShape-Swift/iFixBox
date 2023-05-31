@@ -121,44 +121,45 @@ struct DmManifold {
         // relative velocity
         let rV1 = aV1 - bV1 + aR.crossProduct(aW1) - bR.crossProduct(bW1)
         
-        let rV1proj = rV1.dotProduct(n)
+        let rV1dot = rV1.dotProduct(n)
         
         // only if getting closer
-        guard rV1proj < 0 else {
+        guard rV1dot < 0 else {
             return .noImpact
         }
 
         // new linear velocity
   
-        var adV = iVa.mul(rV1proj) * n
-        var bdV = iVb.mul(rV1proj) * n
+        var adV = iVa.mul(rV1dot) * n
+        var bdV = iVb.mul(rV1dot) * n
         
         // new angular velocity
 
-        var adW = iWa.mul(rV1proj)
-        var bdW = iWb.mul(rV1proj)
+        var adW = iWa.mul(rV1dot)
+        var bdW = iWb.mul(rV1dot)
         
         // tangent vector
-        let tDot = rV1.dotProduct(t)
+        let tV1Dot = rV1.dotProduct(t)
 
         // ignore if it to small
-        if tDot >= 1 {
+        if tV1Dot != 0 {
             // can not be more then original vel
-            let max = -rV1proj
+            let min = rV1dot
+            let max = -rV1dot
             
-            let tV1proj = tDot.clamp(min: -max, max: max).mul(q)
+            let tV1 = tV1Dot.clamp(min: min, max: max).mul(q)
             
-            let adVt = jVa.mul(tV1proj)
-            let adWt = jWa.mul(tV1proj)
+            let adVt = -jVa.mul(tV1)
+            let adWt = -jWa.mul(tV1)
 
-            let bdVt = jVb.mul(tV1proj)
-            let bdWt = jWb.mul(tV1proj)
+            let bdVt = -jVb.mul(tV1)
+            let bdWt = -jWb.mul(tV1)
             
-            adV = adV - adVt * t
-            adW = adW - adWt
+            adV = adV + adVt * t
+            adW = adW + adWt
             
-            bdV = bdV - bdVt * t
-            bdW = bdW - bdWt
+            bdV = bdV + bdVt * t
+            bdW = bdW + bdWt
         }
 
         let aV2 = aV1 + adV
@@ -186,18 +187,18 @@ struct DmManifold {
         // relative velocity
         let rV1 = aV1 - bV1 + aR.crossProduct(aW1) - bR.crossProduct(bW1)
         
-        let rV1proj = rV1.dotProduct(n) - bias
+        let rV1dot = rV1.dotProduct(n) - bias
         
         // only if getting closer
-        guard rV1proj < 0 else {
+        guard rV1dot < 0 else {
             return .noImpact
         }
         
-        let aV2 = aV1 + iVa.mul(rV1proj) * n
-        let aW2 = aW1 + iWa.mul(rV1proj)
+        let aV2 = aV1 + iVa.mul(rV1dot) * n
+        let aW2 = aW1 + iWa.mul(rV1dot)
 
-        let bV2 = bV1 - iVb.mul(rV1proj) * n
-        let bW2 = bW1 - iWb.mul(rV1proj)
+        let bV2 = bV1 - iVb.mul(rV1dot) * n
+        let bW2 = bW1 - iWb.mul(rV1dot)
         
         return DmSolution(
             velA: Velocity(linear: aV2, angular: aW2),

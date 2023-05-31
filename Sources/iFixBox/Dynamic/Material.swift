@@ -9,7 +9,7 @@ import iFixFloat
 
 public struct Material {
     
-    public static let ordinary: Material = Material(bounce: 256, friction: 512, density: 10 * 1024, airLinearFriction: .unit, airAngularFriction: .unit)
+    public static let ordinary: Material = Material(bounce: 256, friction: 768, density: 1024, airLinearFriction: .unit, airAngularFriction: .unit)
     
     public let bounce: FixFloat
     public let friction: FixFloat

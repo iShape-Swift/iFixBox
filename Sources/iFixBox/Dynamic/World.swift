@@ -24,7 +24,7 @@ public struct World {
     public let iTimeStep: FixFloat
     public let biasScale: FixFloat
     public var contacts: [Contact] = []
-
+    public let impactStabilization: Int64
     
     public init(boundary: Boundary, settings: WorldSettings, gravity: FixVec = FixVec(0, -10.fix), isDebug: Bool = false) {
         freezeBoundary = Boundary(min: boundary.min - FixVec(settings.freezeMargin, settings.freezeMargin), max: boundary.max + FixVec(settings.freezeMargin, settings.freezeMargin))
@@ -40,6 +40,7 @@ public struct World {
         iTimeStep = .unit.div(posTimeStep)
         biasScale = iTimeStep / Int64(settings.biasImpact)
         collisionSolver = CollisionSolver()
+        impactStabilization = Int64(settings.impactStabilization)
     }
  
     public func actor(handler: BodyHandler) -> Actor {
