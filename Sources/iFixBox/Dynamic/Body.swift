@@ -47,16 +47,17 @@ public struct Body {
         self.acceleration = Acceleration.zero
     }
 
-    public mutating func attach(shape: Shape) {
-        self.shape = shape
-        if isDynamic {
-            mass = shape.area.mul(material.density)
-            invMass = .unit.div(mass)
-            unitInertia = shape.unitInertia
-            inertia = unitInertia.mul(mass)
-        }
-        self.boundary = .zero
-    }
+//    public mutating func attach(shape: Shape, feature: Feature) {
+//        self.shape = shape
+//        if isDynamic {
+//            mass = feature.area.mul(material.density)
+//            invMass = .unit.div(mass)
+//            unitInertia = feature.unitInertia
+//            inertia = unitInertia.mul(mass)
+//        }
+//        self.transform.position = feature.center
+//        self.boundary = .zero
+//    }
 
     public mutating func addForce(force: FixVec, point: FixVec) {
         guard point != transform.position else {

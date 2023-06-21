@@ -128,13 +128,4 @@ public struct ConvexCollider {
         self.center = transform.convertAsPoint(collider.center)
         self.radius = collider.radius
     }
-    
-    @inlinable
-    public func isContain(_ point: FixVec) -> Bool {
-        guard boundary.isContain(point: point) else {
-            return false
-        }
-
-        return points.isPointInsideConvexPolygon(point: point)
-    }
 }

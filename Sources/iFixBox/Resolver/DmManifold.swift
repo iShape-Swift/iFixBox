@@ -65,6 +65,7 @@ struct DmManifold {
         
         // -(1 + e)
         ke = max(a.material.bounce, b.material.bounce) + .unit
+
         q = (a.material.friction + b.material.friction) >> 1
         
         if contact.penetration < 0 {

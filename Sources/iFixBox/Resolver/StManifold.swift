@@ -51,6 +51,9 @@ struct StManifold {
         
         // -(1 + e)
         ke = max(a.material.bounce, b.material.bounce) + .unit
+        
+        // tangent impulse
+        // -q * rV1 * t / (1 / Ma + (aR * t)^2 / aI)
         q = (a.material.friction + b.material.friction) >> 1
         
         if contact.penetration < 0 {
