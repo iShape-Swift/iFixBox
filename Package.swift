@@ -12,10 +12,10 @@ let package = Package(
             targets: ["iFixBox"]),
     ],
     dependencies: [
-        // Dependencies declare other packages that this package depends on.
-        // .package(url: /* package url */, from: "1.0.0"),
-        .package(url: "https://github.com/iShape-Swift/iFixFloat", from: "0.0.1"),
-        .package(url: "https://github.com/iShape-Swift/iConvex", from: "0.0.1")
+        //        .package(url: "https://github.com/iShape-Swift/iFixFloat", from: "1.1.0"),
+        //        .package(url: "https://github.com/iShape-Swift/iShape", from: "1.2.0")
+                .package(path: "../iFixFloat"),
+                .package(path: "../iConvex"),
     ],
     targets: [
         // Targets are the basic building blocks of a package. A target can define a module or a test suite.

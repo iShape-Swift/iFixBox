@@ -5,6 +5,7 @@
 //  Created by Nail Sharipov on 09.05.2023.
 //
 
+import iShape
 import iFixFloat
 
 public struct Transform {
@@ -44,8 +45,8 @@ public struct Transform {
     
     @inlinable
     public func convertAsVector(_ vector: FixVec) -> FixVec {
-        let x = (rotator.x * vector.x - rotator.y * vector.y).normalize
-        let y = (rotator.y * vector.x + rotator.x * vector.y).normalize
+        let x = (rotator.x * vector.x - rotator.y * vector.y).fixNormalize
+        let y = (rotator.y * vector.x + rotator.x * vector.y).fixNormalize
         return FixVec(x, y)
     }
     
@@ -58,7 +59,7 @@ public struct Transform {
         return result
     }
     
-    public func convert(_ boundary: Boundary) -> Boundary {
+    public func convert(_ boundary: FixBnd) -> FixBnd {
         if angle == 0 {
             return boundary.translate(delta: position)
         } else {
@@ -78,7 +79,7 @@ public struct Transform {
             let maxX = max(max(b0.x, b1.x), max(b2.x, b3.x))
             let maxY = max(max(b0.y, b1.y), max(b2.y, b3.y))
             
-            return Boundary(min: FixVec(minX, minY), max: FixVec(maxX, maxY))
+            return FixBnd(min: FixVec(minX, minY), max: FixVec(maxX, maxY))
         }
     }
     
@@ -117,8 +118,8 @@ public struct Transform {
         
         let dv = b.position - a.position
         
-        let x = (cosA * dv.x + sinA * dv.y).normalize
-        let y = (cosA * dv.y - sinA * dv.x).normalize
+        let x = (cosA * dv.x + sinA * dv.y).fixNormalize
+        let y = (cosA * dv.y - sinA * dv.x).fixNormalize
         
         return Transform(position: FixVec(x, y), angle: ang, rotator: rot)
     }
@@ -129,8 +130,8 @@ public struct Transform {
 
         let dv = b.position - a.position
 
-        let x = (cosA * dv.x + sinA * dv.y).normalize
-        let y = (cosA * dv.y - sinA * dv.x).normalize
+        let x = (cosA * dv.x + sinA * dv.y).fixNormalize
+        let y = (cosA * dv.y - sinA * dv.x).fixNormalize
 
         return FixVec(x, y)
     }

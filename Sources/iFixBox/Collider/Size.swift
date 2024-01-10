@@ -18,6 +18,6 @@ public extension Size {
     var height: FixFloat { y }
     
     @inlinable
-    var area: FixFloat { x.mul(y) }
+    var area: FixFloat { x.fixMul(y) }
     
 }

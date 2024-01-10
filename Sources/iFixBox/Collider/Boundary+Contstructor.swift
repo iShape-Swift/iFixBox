@@ -5,9 +5,10 @@
 //  Created by Nail Sharipov on 09.05.2023.
 //
 
+import iShape
 import iFixFloat
 
-public extension Boundary {
+public extension FixBnd {
     
     init(size: Size) {
         let half = size.half
@@ -34,7 +35,7 @@ public extension Boundary {
         self.init(min: FixVec(minX, minY), max: FixVec(maxX, maxY))
     }
     
-    func translate(delta: FixVec) -> Boundary {
-        Boundary(min: min + delta, max: max + delta)
+    func translate(delta: FixVec) -> FixBnd {
+        FixBnd(min: min + delta, max: max + delta)
     }
 }

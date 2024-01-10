@@ -18,20 +18,20 @@ public extension CollisionSolver {
 
         let sqrC = ca.sqrDistance(cb)
 
-        if (ra + rb).sqr >= sqrC {
-            let penetration = ra + rb - sqrC.sqrt
+        if (ra + rb).fixSqr >= sqrC {
+            let penetration = ra + rb - sqrC.fixSqrt
                 
-            let sqrA = ra.sqr
-            let sqrB = rb.sqr
+            let sqrA = ra.fixSqr
+            let sqrB = rb.fixSqr
 
             let dv = ca - cb
             
             if sqrC >= sqrA && sqrC >= sqrB {
-                let k = (sqrB - sqrA + sqrC).div(sqrC << 1)
+                let k = (sqrB - sqrA + sqrC).fixDiv(sqrC << 1)
 
                 let p = cb + dv * k
 
-                let nA = dv.normalize
+                let nA = dv.fixNormalize
                 
                 return Contact(
                     point: p,
@@ -42,7 +42,7 @@ public extension CollisionSolver {
                 )
             } else {
                 let p = sqrB > sqrA ? ca : cb
-                let n = dv.sqrLength != 0 ? dv.normalize : FixVec(x: 0, y: .unit)
+                let n = dv.fixSqrLength != 0 ? dv.fixNormalize : FixVec(x: 0, y: .unit)
                     
                 return Contact(
                     point: p,

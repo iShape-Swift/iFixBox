@@ -9,21 +9,21 @@ import iFixFloat
 
 extension World {
 
-    func calcFeature(shape: Shape) -> Feature {
+    public func calcFeature(shape: Shape) -> Feature {
         let area: FixFloat
         let unitInertia: FixFloat
         let center: FixVec
 
         switch shape.form {
         case .circle:
-            let rr = shape.radius.sqr
-            area = FixFloat.pi.mul(rr)
+            let rr = shape.radius.fixSqr
+            area = FixFloat.pi.fixMul(rr)
             unitInertia = rr / 2
             center = .zero
         case .rect:
             let size = shape.size
             area = size.area
-            unitInertia = size.sqrLength.mul(85) // 85 ~= 1024 / 12
+            unitInertia = size.fixSqrLength.fixMul(85) // 85 ~= 1024 / 12
             center = .zero
         case .polygon:
             area = 0
@@ -33,13 +33,6 @@ extension World {
 
         return Feature(area: area, unitInertia: unitInertia, center: center)
     }
-    
-//    func createShape([]) -> Shape {
-//        
-//    }
-//    
-//    func attache(shape: Shape, ) {
-//        
-//    }
+
 }
     

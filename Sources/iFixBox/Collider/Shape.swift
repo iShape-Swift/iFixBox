@@ -13,10 +13,10 @@ public enum Form {
     case polygon
 }
 
-struct Feature {
-    let area: FixFloat
-    let unitInertia: FixFloat
-    let center: FixVec
+public struct Feature {
+    public let area: FixFloat
+    public let unitInertia: FixFloat
+    public let center: FixVec
 }
 
 public struct Shape {

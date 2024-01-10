@@ -70,7 +70,7 @@ struct DmManifold {
         
         if contact.penetration < 0 {
             let l = -contact.penetration
-            bias = l.mul(biasScale)
+            bias = l.fixMul(biasScale)
         } else {
             bias = 0
         }
@@ -85,26 +85,26 @@ struct DmManifold {
         
         // normal impulse
         
-        aRn = aR.crossProduct(n)
-        bRn = bR.crossProduct(n)
+        aRn = aR.fixCrossProduct(n)
+        bRn = bR.fixCrossProduct(n)
 
-        let i = (ke << FixFloat.pentaFactionBits) / (ii * (a.mass + b.mass) + aRn.sqr * b.inertia + bRn.sqr * a.inertia)
+        let i = (ke << FixFloat.pentaFactionBits) / (ii * (a.mass + b.mass) + aRn.fixSqr * b.inertia + bRn.fixSqr * a.inertia)
 
-        iVa = -((i * ii.mul(b.mass)) >> FixFloat.tetraFactionBits)
-        iVb = -((i * ii.mul(a.mass)) >> FixFloat.tetraFactionBits)
+        iVa = -((i * ii.fixMul(b.mass)) >> FixFloat.tetraFactionBits)
+        iVb = -((i * ii.fixMul(a.mass)) >> FixFloat.tetraFactionBits)
         
         iWa = -((i * aRn * b.inertia) >> FixFloat.tetraFactionBits)
         iWb = -((i * bRn * a.inertia) >> FixFloat.tetraFactionBits)
         
         // tangent impulse
         
-        aRt = aR.crossProduct(t)
-        bRt = bR.crossProduct(t)
+        aRt = aR.fixCrossProduct(t)
+        bRt = bR.fixCrossProduct(t)
         
-        let j = (.unit << FixFloat.pentaFactionBits) / (ii * (a.mass + b.mass) + aRt.sqr * b.inertia + bRt.sqr * a.inertia)
+        let j = (.unit << FixFloat.pentaFactionBits) / (ii * (a.mass + b.mass) + aRt.fixSqr * b.inertia + bRt.fixSqr * a.inertia)
 
-        jVa = -((j * ii.mul(b.mass)) >> FixFloat.tetraFactionBits)
-        jVb = -((j * ii.mul(a.mass)) >> FixFloat.tetraFactionBits)
+        jVa = -((j * ii.fixMul(b.mass)) >> FixFloat.tetraFactionBits)
+        jVb = -((j * ii.fixMul(a.mass)) >> FixFloat.tetraFactionBits)
         
         jWa = -((j * aRt * b.inertia) >> FixFloat.tetraFactionBits)
         jWb = -((j * bRt * a.inertia) >> FixFloat.tetraFactionBits)
@@ -120,9 +120,9 @@ struct DmManifold {
         let bW1 = velB.angular
         
         // relative velocity
-        let rV1 = aV1 - bV1 + aR.crossProduct(aW1) - bR.crossProduct(bW1)
+        let rV1 = aV1 - bV1 + aR.fixCrossProduct(aW1) - bR.fixCrossProduct(bW1)
         
-        let rV1dot = rV1.dotProduct(n)
+        let rV1dot = rV1.fixDotProduct(n)
         
         // only if getting closer
         guard rV1dot < 0 else {
@@ -131,16 +131,16 @@ struct DmManifold {
 
         // new linear velocity
   
-        var adV = iVa.mul(rV1dot) * n
-        var bdV = iVb.mul(rV1dot) * n
+        var adV = iVa.fixMul(rV1dot) * n
+        var bdV = iVb.fixMul(rV1dot) * n
         
         // new angular velocity
 
-        var adW = iWa.mul(rV1dot)
-        var bdW = iWb.mul(rV1dot)
+        var adW = iWa.fixMul(rV1dot)
+        var bdW = iWb.fixMul(rV1dot)
         
         // tangent vector
-        let tV1Dot = rV1.dotProduct(t)
+        let tV1Dot = rV1.fixDotProduct(t)
 
         // ignore if it to small
         if tV1Dot != 0 {
@@ -148,13 +148,13 @@ struct DmManifold {
             let min = rV1dot
             let max = -rV1dot
             
-            let tV1 = tV1Dot.clamp(min: min, max: max).mul(q)
+            let tV1 = tV1Dot.clamp(min: min, max: max).fixMul(q)
             
-            let adVt = jVa.mul(tV1)
-            let adWt = jWa.mul(tV1)
+            let adVt = jVa.fixMul(tV1)
+            let adWt = jWa.fixMul(tV1)
 
-            let bdVt = jVb.mul(tV1)
-            let bdWt = jWb.mul(tV1)
+            let bdVt = jVb.fixMul(tV1)
+            let bdWt = jWb.fixMul(tV1)
             
             adV = adV + adVt * t
             adW = adW + adWt
@@ -186,20 +186,20 @@ struct DmManifold {
         let bW1 = velB.angular
         
         // relative velocity
-        let rV1 = aV1 - bV1 + aR.crossProduct(aW1) - bR.crossProduct(bW1)
+        let rV1 = aV1 - bV1 + aR.fixCrossProduct(aW1) - bR.fixCrossProduct(bW1)
         
-        let rV1dot = rV1.dotProduct(n) - bias
+        let rV1dot = rV1.fixDotProduct(n) - bias
         
         // only if getting closer
         guard rV1dot < 0 else {
             return .noImpact
         }
         
-        let aV2 = aV1 + iVa.mul(rV1dot) * n
-        let aW2 = aW1 + iWa.mul(rV1dot)
+        let aV2 = aV1 + iVa.fixMul(rV1dot) * n
+        let aW2 = aW1 + iWa.fixMul(rV1dot)
 
-        let bV2 = bV1 - iVb.mul(rV1dot) * n
-        let bW2 = bW1 - iWb.mul(rV1dot)
+        let bV2 = bV1 - iVb.fixMul(rV1dot) * n
+        let bW2 = bW1 - iWb.fixMul(rV1dot)
         
         return DmSolution(
             velA: Velocity(linear: aV2, angular: aW2),

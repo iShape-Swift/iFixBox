@@ -44,7 +44,7 @@ public struct WorldSettings {
         self.bodyCapacity = bodyCapacity
         self.freezeMargin = freezeMargin
         self.gridSpaceFactor = gridSpaceFactor
-        self.posTimeStep = FixFloat(16).div(FixFloat(positionIterations))
+        self.posTimeStep = FixFloat(16).fixDiv(FixFloat(positionIterations))
         self.biasImpact = biasImpact
         self.impactStabilization = Self.calculateImpact(count: velocityIterations, target: impactEnergyLossCoefficient)
     }

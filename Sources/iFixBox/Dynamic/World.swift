@@ -6,10 +6,11 @@
 //
 
 import iFixFloat
+import iShape
 
 public struct World {
     
-    public let freezeBoundary: Boundary
+    public let freezeBoundary: FixBnd
     public let gravity: FixVec
     public let isDebug: Bool
     let collisionSolver: CollisionSolver
@@ -26,8 +27,8 @@ public struct World {
     public var contacts: [Contact] = []
     public let impactStabilization: Int64
     
-    public init(boundary: Boundary, settings: WorldSettings, gravity: FixVec = FixVec(0, -10.fix), isDebug: Bool = false) {
-        freezeBoundary = Boundary(min: boundary.min - FixVec(settings.freezeMargin, settings.freezeMargin), max: boundary.max + FixVec(settings.freezeMargin, settings.freezeMargin))
+    public init(boundary: FixBnd, settings: WorldSettings, gravity: FixVec = FixVec(0, -10.fix), isDebug: Bool = false) {
+        freezeBoundary = FixBnd(min: boundary.min - FixVec(settings.freezeMargin, settings.freezeMargin), max: boundary.max + FixVec(settings.freezeMargin, settings.freezeMargin))
         self.gravity = gravity
         self.isDebug = isDebug
         
@@ -37,7 +38,7 @@ public struct World {
         posTimeStep = settings.posTimeStep
         positionIterations = settings.positionIterations
         velocityIterations = settings.velocityIterations
-        iTimeStep = .unit.div(posTimeStep)
+        iTimeStep = .unit.fixDiv(posTimeStep)
         biasScale = iTimeStep / Int64(settings.biasImpact)
         collisionSolver = CollisionSolver()
         impactStabilization = Int64(settings.impactStabilization)
@@ -69,12 +70,12 @@ public struct World {
         bodyStore.removeAll()
     }
     
-    public func boundary(shape: Shape, transform: Transform) -> Boundary {
+    public func boundary(shape: Shape, transform: Transform) -> FixBnd {
         switch shape.form {
         case .circle:
-            return Boundary(radius: shape.radius, delta: transform.position)
+            return FixBnd(radius: shape.radius, delta: transform.position)
         case .rect:
-            return Boundary(size: shape.size, transform: transform)
+            return FixBnd(size: shape.size, transform: transform)
         case .polygon:
             return .zero
         }

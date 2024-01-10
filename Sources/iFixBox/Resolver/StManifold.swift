@@ -58,7 +58,7 @@ struct StManifold {
         
         if contact.penetration < 0 {
             let l = -contact.penetration
-            bias = l.mul(biasScale)
+            bias = l.fixMul(biasScale)
         } else {
             bias = 0
         }
@@ -68,13 +68,13 @@ struct StManifold {
         
         // distance between center of Mass B to contact point
         let bR = contact.point - b.transform.position
-        bRvw = b.velocity.linear.negative - bR.crossProduct(b.velocity.angular)
+        bRvw = b.velocity.linear.negative - bR.fixCrossProduct(b.velocity.angular)
 
-        let aRn = aR.crossProduct(n)
-        let aRt = aR.crossProduct(t)
+        let aRn = aR.fixCrossProduct(n)
+        let aRt = aR.fixCrossProduct(t)
 
-        let i = (ke << FixFloat.cubeFactionBits) / (a.unitInertia + aRn.sqr)
-        let j = (q << FixFloat.cubeFactionBits) / (a.unitInertia + aRt.sqr)
+        let i = (ke << FixFloat.cubeFactionBits) / (a.unitInertia + aRn.fixSqr)
+        let j = (q << FixFloat.cubeFactionBits) / (a.unitInertia + aRt.fixSqr)
         
         iVa = -((a.unitInertia * i) >> FixFloat.cubeFactionBits)
         iWa = -((aRn * i) >> FixFloat.cubeFactionBits)
@@ -90,20 +90,20 @@ struct StManifold {
         let aW1 = velA.angular
         
         // relative velocity
-        let rV1 = aV1 + aR.crossProduct(aW1) + bRvw
+        let rV1 = aV1 + aR.fixCrossProduct(aW1) + bRvw
 
-        let rV1dot = rV1.dotProduct(n)
+        let rV1dot = rV1.fixDotProduct(n)
         
         // only if getting closer
         guard rV1dot < 0 else {
             return .noImpact
         }
 
-        var adV = iVa.mul(rV1dot) * n
-        var adW = iWa.mul(rV1dot)
+        var adV = iVa.fixMul(rV1dot) * n
+        var adW = iWa.fixMul(rV1dot)
         
         // tangent vector
-        let tV1Dot = rV1.dotProduct(t)
+        let tV1Dot = rV1.fixDotProduct(t)
         
         // ignore if it to small
         if tV1Dot != 0 {
@@ -111,10 +111,10 @@ struct StManifold {
             let min = rV1dot
             let max = -rV1dot
             
-            let tV1 = tV1Dot.clamp(min: min, max: max).mul(q)
+            let tV1 = tV1Dot.clamp(min: min, max: max).fixMul(q)
             
-            let adVt = jVa.mul(tV1)
-            let adWt = jWa.mul(tV1)
+            let adVt = jVa.fixMul(tV1)
+            let adWt = jWa.fixMul(tV1)
             
             adV = adV + adVt * t
             adW = adW + adWt
@@ -133,17 +133,17 @@ struct StManifold {
         let aW1 = velA.angular
         
         // relative velocity
-        let rV1 = aV1 + aR.crossProduct(aW1) + bRvw
+        let rV1 = aV1 + aR.fixCrossProduct(aW1) + bRvw
 
-        let rV1dot = rV1.dotProduct(n) - bias
+        let rV1dot = rV1.fixDotProduct(n) - bias
         
         // only if getting closer
         guard rV1dot < 0 else {
             return .noImpact
         }
 
-        let aV2 = aV1 + iVa.mul(rV1dot) * n
-        let aW2 = aW1 + iWa.mul(rV1dot)
+        let aV2 = aV1 + iVa.fixMul(rV1dot) * n
+        let aW2 = aW1 + iWa.fixMul(rV1dot)
 
         return StImpactSolution(vel: Velocity(linear: aV2, angular: aW2), isImpact: true)
     }

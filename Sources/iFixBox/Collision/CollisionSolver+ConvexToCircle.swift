@@ -17,7 +17,7 @@ public extension CollisionSolver {
 
         for i in 0..<convex.points.count {
             let d = circle.center - convex.points[i]
-            let s = convex.normals[i].dotProduct(d)
+            let s = convex.normals[i].fixDotProduct(d)
 
             if s > r {
                 return Contact.outside
@@ -47,38 +47,38 @@ public extension CollisionSolver {
             )
         }
 
-        let sqrRadius = circle.radius.sqr
+        let sqrRadius = circle.radius.fixSqr
 
-        let u1 = (circle.center - v1).dotProduct(v2 - v1)
+        let u1 = (circle.center - v1).fixDotProduct(v2 - v1)
 
         if u1 <= 0 {
             if circle.center.sqrDistance(v1) > sqrRadius {
                 return Contact.outside
             }
 
-            let nB = (circle.center - v1).normalize
+            let nB = (circle.center - v1).fixNormalize
             return Contact(point: v1, normal: nB, penetration: delta, status: .collide, type: .vertex)
         }
 
-        let u2 = (circle.center - v2).dotProduct(v1 - v2)
+        let u2 = (circle.center - v2).fixDotProduct(v1 - v2)
 
         if u2 <= 0 {
             if circle.center.sqrDistance(v2) > sqrRadius {
                 return Contact.outside
             }
 
-            let nB = (circle.center - v2).normalize
+            let nB = (circle.center - v2).fixNormalize
             return Contact(point: v2, normal: nB, penetration: delta, status: .collide, type: .vertex)
         }
 
         let faceCenter = v1.middle(v2)
 
-        let sc = (circle.center - faceCenter).dotProduct(n1)
+        let sc = (circle.center - faceCenter).fixDotProduct(n1)
         if sc > circle.radius {
             return Contact.outside
         }
 
-        let dc = (circle.center - v2).dotProduct(n1)
+        let dc = (circle.center - v2).fixDotProduct(n1)
         let m = circle.center - dc * n1
 
         return Contact(point: m, normal: n1, penetration: delta, status: .collide, type: .vertex)

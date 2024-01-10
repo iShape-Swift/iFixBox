@@ -5,6 +5,7 @@
 //  Created by Nail Sharipov on 09.05.2023.
 //
 
+import iShape
 import iFixFloat
 
 public struct ConvexCollider {
@@ -12,7 +13,7 @@ public struct ConvexCollider {
     public let center: FixVec
     public let points: [FixVec]
     public let normals: [FixVec]
-    public let boundary: Boundary
+    public let boundary: FixBnd
     public let radius: FixFloat
 
     public var circleCollider: CircleCollider {
@@ -39,7 +40,7 @@ public struct ConvexCollider {
         self.center = FixVec(0, 0)
         self.points = points
         self.normals = normals
-        self.boundary = Boundary(min: FixVec(-a, -b), max: FixVec(a, b))
+        self.boundary = FixBnd(min: FixVec(-a, -b), max: FixVec(a, b))
         self.radius = min(a, b)
     }
 
@@ -58,10 +59,10 @@ public struct ConvexCollider {
             let p1 = points[i]
             let e = p1 - p0
 
-            let nm = FixVec(-e.y, e.x).normalize
+            let nm = FixVec(-e.y, e.x).fixNormalize
             normals[j] = nm
 
-            let crossProduct = p1.crossProduct(p0)
+            let crossProduct = p1.fixCrossProduct(p0)
             area += crossProduct
 
             let sp = p0 + p1
@@ -74,13 +75,13 @@ public struct ConvexCollider {
         area >>= 1
         let s = 6 * area
 
-        let x = centroid.x.div(s)
-        let y = centroid.y.div(s)
+        let x = centroid.x.fixDiv(s)
+        let y = centroid.y.fixDiv(s)
 
         self.center = FixVec(x, y)
         self.points = points
         self.normals = normals
-        self.boundary = Boundary(points: points)
+        self.boundary = FixBnd(points: points)
 
         var minR = Int64.max
 
@@ -89,7 +90,7 @@ public struct ConvexCollider {
             let n = normals[i]
 
             let v = p - center
-            let r = abs(v.dotProduct(n))
+            let r = abs(v.fixDotProduct(n))
 
             if r < minR {
                 minR = r
@@ -124,7 +125,7 @@ public struct ConvexCollider {
 
         self.points = points
         self.normals = normals
-        self.boundary = Boundary(min: FixVec(minX, minY), max: FixVec(maxX, maxY))
+        self.boundary = FixBnd(min: FixVec(minX, minY), max: FixVec(maxX, maxY))
         self.center = transform.convertAsPoint(collider.center)
         self.radius = collider.radius
     }

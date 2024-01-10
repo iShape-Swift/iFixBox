@@ -6,6 +6,7 @@
 //
 
 import iFixFloat
+import iShape
 
 public struct Body {
     
@@ -24,38 +25,50 @@ public struct Body {
     public private (set) var acceleration: Acceleration
     public private (set) var transform: Transform
     
-    public var boundary: Boundary
+    public var boundary: FixBnd
     public let applyGravity: Bool
     public var isAlive: Bool
     public let isDynamic: Bool
 
-    public init(id: Int64, transform: Transform, isDynamic: Bool = true, material: Material = .ordinary, applyGravity: Bool = true) {
+    public init(id: Int64, transform: Transform, shape: Shape? = nil, feature: Feature? = nil, isDynamic: Bool = true, material: Material = .ordinary, applyGravity: Bool = true) {
         self.id = id
         self.isDynamic = isDynamic
 
         self.material = material
-        self.shape = Shape.empty
         self.invMass = 0
         self.mass = 0
         self.inertia = 0
         self.unitInertia = 0
         self.velocity = Velocity.zero
         self.transform = transform
-        self.boundary = Boundary.zero
+        self.boundary = .zero
         self.isAlive = true
         self.applyGravity = applyGravity && isDynamic
         self.acceleration = Acceleration.zero
+        
+        if let shape = shape, let feature = feature {
+            self.shape = shape
+            if isDynamic {
+                mass = feature.area.fixMul(material.density)
+                invMass = .unit.fixDiv(mass)
+                unitInertia = feature.unitInertia
+                inertia = unitInertia.fixMul(mass)
+            }
+        } else {
+            self.shape = Shape.empty
+        }
+        
     }
-
+//
 //    public mutating func attach(shape: Shape, feature: Feature) {
 //        self.shape = shape
 //        if isDynamic {
-//            mass = feature.area.mul(material.density)
-//            invMass = .unit.div(mass)
+//            mass = feature.area.fixMul(material.density)
+//            invMass = .unit.fixDiv(mass)
 //            unitInertia = feature.unitInertia
-//            inertia = unitInertia.mul(mass)
+//            inertia = unitInertia.fixMul(mass)
 //        }
-//        self.transform.position = feature.center
+//        self.transform = Transform(position: feature.center)
 //        self.boundary = .zero
 //    }
 
@@ -66,11 +79,11 @@ public struct Body {
         }
 
         let r = point - transform.position
-        let n = r.normalize
-        let projF = force.dotProduct(n)
-        let a = projF.mul(invMass) * n
-        let moment = force.crossProduct(r)
-        let wa = moment.div(inertia)
+        let n = r.fixNormalize
+        let projF = force.fixDotProduct(n)
+        let a = projF.fixMul(invMass) * n
+        let moment = force.fixCrossProduct(r)
+        let wa = moment.fixDiv(inertia)
 
         acceleration = Acceleration(linear: acceleration.linear + a, angular: acceleration.angular + wa)
     }
@@ -82,9 +95,9 @@ public struct Body {
         }
 
         let r = point - transform.position
-        let n = r.normalize
-        let a = acceleration.dotProduct(n) * n
-        let wa = acceleration.crossProduct(r).mul(unitInertia)
+        let n = r.fixNormalize
+        let a = acceleration.fixDotProduct(n) * n
+        let wa = acceleration.fixCrossProduct(r).fixMul(unitInertia)
 
         self.acceleration = Acceleration(linear: self.acceleration.linear + a, angular: self.acceleration.angular + wa)
     }
@@ -96,9 +109,9 @@ public struct Body {
         }
 
         let r = point - transform.position
-        let n = r.normalize
-        let v = velocity.dotProduct(n) * n
-        let w = velocity.crossProduct(r)
+        let n = r.fixNormalize
+        let v = velocity.fixDotProduct(n) * n
+        let w = velocity.fixCrossProduct(r)
 
         self.velocity = Velocity(linear: self.velocity.linear + v, angular: self.velocity.angular + w)
     }
@@ -116,7 +129,7 @@ public struct Body {
         self.velocity = Velocity(linear: self.velocity.linear, angular: self.velocity.angular + velocity)
     }
     
-    internal mutating func stepUpdate(velocity: Velocity, transform: Transform, boundary: Boundary) {
+    internal mutating func stepUpdate(velocity: Velocity, transform: Transform, boundary: FixBnd) {
         self.acceleration = .zero
         self.velocity = velocity
         self.transform = transform
