@@ -311,10 +311,10 @@ public extension World {
             
             let acceleration = body.applyGravity ? body.acceleration.linear + gravity : body.acceleration.linear
             
-            let v = body.velocity.linear + acceleration * posTimeStep
+            let v = body.velocity.linear + acceleration.fixMul(posTimeStep)
             let w = body.velocity.angular + body.acceleration.angular.fixMul(posTimeStep)
             
-            let p = body.transform.position + v * posTimeStep
+            let p = body.transform.position + v.fixMul(posTimeStep)
             let a = body.transform.angle + w.fixMul(posTimeStep)
 
             let velocity = Velocity(linear: v, angular: w)
@@ -336,7 +336,7 @@ public extension World {
 
             // update position, we use bias impact here
             
-            let pos = body.transform.position + v.biasVel.linear * posTimeStep
+            let pos = body.transform.position + v.biasVel.linear.fixMul(posTimeStep)
             let ang = body.transform.angle + v.biasVel.angular.fixMul(posTimeStep)
             
             let transform = Transform(position: pos, angle: ang)
@@ -344,7 +344,7 @@ public extension World {
             
             // update velocity, do not include bias here
             
-            let lin = v.velocity.linear + acceleration * posTimeStep
+            let lin = v.velocity.linear + acceleration.fixMul(posTimeStep)
             let rot = v.velocity.angular + body.acceleration.angular.fixMul(posTimeStep)
             
             let velocity = Velocity(linear: lin, angular: rot)

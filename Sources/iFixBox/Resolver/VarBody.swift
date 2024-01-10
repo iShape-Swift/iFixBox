@@ -53,7 +53,7 @@ struct VarVelocity {
             return velocity
         } else {
             let k = FixFloat.unit / Int64(count) - impactStabilization // every impact body will lose energy
-            let linear = k * FixVec(velocity.linear.x, velocity.linear.y)
+            let linear = FixVec(velocity.linear.x, velocity.linear.y).fixMul(k)
             let angular = velocity.angular.fixMul(k)
             
             return Velocity(linear: linear, angular: angular)

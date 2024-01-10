@@ -29,7 +29,7 @@ public extension CollisionSolver {
             if sqrC >= sqrA && sqrC >= sqrB {
                 let k = (sqrB - sqrA + sqrC).fixDiv(sqrC << 1)
 
-                let p = cb + dv * k
+                let p = cb + dv.fixMul(k)
 
                 let nA = dv.fixNormalize
                 

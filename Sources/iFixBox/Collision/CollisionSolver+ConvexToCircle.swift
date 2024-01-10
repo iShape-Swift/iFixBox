@@ -79,7 +79,7 @@ public extension CollisionSolver {
         }
 
         let dc = (circle.center - v2).fixDotProduct(n1)
-        let m = circle.center - dc * n1
+        let m = circle.center - n1.fixMul(dc)
 
         return Contact(point: m, normal: n1, penetration: delta, status: .collide, type: .vertex)
     }

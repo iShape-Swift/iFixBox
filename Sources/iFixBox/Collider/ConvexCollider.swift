@@ -66,7 +66,7 @@ public struct ConvexCollider {
             area += crossProduct
 
             let sp = p0 + p1
-            centroid = centroid + sp * crossProduct
+            centroid = centroid + sp.fixMul(crossProduct)
 
             p0 = p1
             j = i

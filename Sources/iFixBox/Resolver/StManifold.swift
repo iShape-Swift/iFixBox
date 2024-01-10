@@ -99,7 +99,7 @@ struct StManifold {
             return .noImpact
         }
 
-        var adV = iVa.fixMul(rV1dot) * n
+        var adV = n.fixMul(iVa.fixMul(rV1dot))
         var adW = iWa.fixMul(rV1dot)
         
         // tangent vector
@@ -116,7 +116,7 @@ struct StManifold {
             let adVt = jVa.fixMul(tV1)
             let adWt = jWa.fixMul(tV1)
             
-            adV = adV + adVt * t
+            adV = adV + t.fixMul(adVt)
             adW = adW + adWt
         }
         
@@ -142,7 +142,7 @@ struct StManifold {
             return .noImpact
         }
 
-        let aV2 = aV1 + iVa.fixMul(rV1dot) * n
+        let aV2 = aV1 + n.fixMul(iVa.fixMul(rV1dot))
         let aW2 = aW1 + iWa.fixMul(rV1dot)
 
         return StImpactSolution(vel: Velocity(linear: aV2, angular: aW2), isImpact: true)

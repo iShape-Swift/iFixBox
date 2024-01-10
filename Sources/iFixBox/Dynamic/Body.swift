@@ -74,14 +74,14 @@ public struct Body {
 
     public mutating func addForce(force: FixVec, point: FixVec) {
         guard point != transform.position else {
-            self.addAccelerationToCenterOfMass(force * invMass)
+            self.addAccelerationToCenterOfMass(force.fixMul(invMass))
             return
         }
 
         let r = point - transform.position
         let n = r.fixNormalize
         let projF = force.fixDotProduct(n)
-        let a = projF.fixMul(invMass) * n
+        let a = n.fixMul(projF.fixMul(invMass))
         let moment = force.fixCrossProduct(r)
         let wa = moment.fixDiv(inertia)
 
@@ -96,7 +96,7 @@ public struct Body {
 
         let r = point - transform.position
         let n = r.fixNormalize
-        let a = acceleration.fixDotProduct(n) * n
+        let a = n.fixMul(acceleration.fixDotProduct(n))
         let wa = acceleration.fixCrossProduct(r).fixMul(unitInertia)
 
         self.acceleration = Acceleration(linear: self.acceleration.linear + a, angular: self.acceleration.angular + wa)
@@ -110,7 +110,7 @@ public struct Body {
 
         let r = point - transform.position
         let n = r.fixNormalize
-        let v = velocity.fixDotProduct(n) * n
+        let v = n.fixMul(velocity.fixDotProduct(n))
         let w = velocity.fixCrossProduct(r)
 
         self.velocity = Velocity(linear: self.velocity.linear + v, angular: self.velocity.angular + w)

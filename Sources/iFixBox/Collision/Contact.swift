@@ -38,9 +38,9 @@ public struct Contact {
 
     public func correction(isDirect: Bool) -> FixVec {
         if isDirect {
-            return -penetration * normal
+            return normal.fixMul(-penetration)
         } else {
-            return penetration * normal
+            return normal.fixMul(penetration)
         }
     }
 

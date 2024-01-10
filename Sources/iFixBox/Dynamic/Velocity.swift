@@ -27,7 +27,7 @@ public struct Velocity {
 
     @inlinable
     public func apply(timeStep: Int64, acceleration: Acceleration) -> Velocity {
-        let dA = acceleration.linear * timeStep
+        let dA = acceleration.linear.fixMul(timeStep)
         let dWa = acceleration.angular * timeStep
         return Velocity(linear: linear + dA, angular: angular + dWa)
     }

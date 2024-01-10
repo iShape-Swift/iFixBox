@@ -131,8 +131,8 @@ struct DmManifold {
 
         // new linear velocity
   
-        var adV = iVa.fixMul(rV1dot) * n
-        var bdV = iVb.fixMul(rV1dot) * n
+        var adV = n.fixMul(iVa.fixMul(rV1dot))
+        var bdV = n.fixMul(iVb.fixMul(rV1dot))
         
         // new angular velocity
 
@@ -156,10 +156,10 @@ struct DmManifold {
             let bdVt = jVb.fixMul(tV1)
             let bdWt = jWb.fixMul(tV1)
             
-            adV = adV + adVt * t
+            adV = adV + t.fixMul(adVt)
             adW = adW + adWt
             
-            bdV = bdV + bdVt * t
+            bdV = bdV + t.fixMul(bdVt)
             bdW = bdW + bdWt
         }
 
@@ -195,10 +195,10 @@ struct DmManifold {
             return .noImpact
         }
         
-        let aV2 = aV1 + iVa.fixMul(rV1dot) * n
+        let aV2 = aV1 + n.fixMul(iVa.fixMul(rV1dot))
         let aW2 = aW1 + iWa.fixMul(rV1dot)
 
-        let bV2 = bV1 - iVb.fixMul(rV1dot) * n
+        let bV2 = bV1 - n.fixMul(iVb.fixMul(rV1dot))
         let bW2 = bW1 - iWb.fixMul(rV1dot)
         
         return DmSolution(

@@ -93,7 +93,7 @@ public struct Transform {
     
     @inlinable
     public func apply(_ v: Velocity, timeStep: Int64) -> Transform {
-        let dv = v.linear * timeStep
+        let dv = v.linear.fixMul(timeStep)
         let p = position + dv
         
         if v.angular != 0 {
